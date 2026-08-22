@@ -240,6 +240,11 @@ Tracked in GitHub issues — [milestones board](https://github.com/crafter-resea
 | P2 — Later | [#13 Driver facturador](https://github.com/crafter-research/sunat-cli/issues/13) · [#14 SIRE reportes complementarios](https://github.com/crafter-research/sunat-cli/issues/14) · [#15 sqlite padrón index](https://github.com/crafter-research/sunat-cli/issues/15) · [#16 CI smoke jobs](https://github.com/crafter-research/sunat-cli/issues/16) · [#17 TUS auto-resume](https://github.com/crafter-research/sunat-cli/issues/17) |
 | P3 — Backlog | [#30 F.1683 arrendamiento](https://github.com/crafter-research/sunat-cli/issues/30) |
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, safety boundaries, and focused
+issues suitable for external contributors.
+
 ## Research
 
 3 SUNAT portals reverse-engineered. F616 input mask cracked via raw CDP WebSocket. reCAPTCHA bypassed through OAuth state exploitation. UBL 2.1 + XAdES-BES manually implemented (xml-crypto v6 had nested-signature quirks).
@@ -268,4 +273,4 @@ A merge that leaves `version` untouched publishes nothing.
 
 ## License
 
-MIT — [Crafter Station](https://crafterstation.com), Lima, Peru
+[MIT](LICENSE), Copyright 2026 Crafter Research.
