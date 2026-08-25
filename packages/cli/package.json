@@ -1,6 +1,6 @@
 {
 	"name": "@crafter/sunat-cli",
-	"version": "0.9.0",
+	"version": "0.10.0",
 	"description": "Agent-first CLI for SUNAT tax automation",
 	"module": "bin/sunat.ts",
 	"type": "module",
@@ -25,9 +25,13 @@
 		"cdp"
 	],
 	"bin": {
-		"sunat-cli": "bin/sunat.ts"
+		"sunat-cli": "dist/sunat.js"
+	},
+	"engines": {
+		"node": ">=24"
 	},
 	"files": [
+		"dist",
 		"bin",
 		"src",
 		"!src/**/RESEARCH.md",
@@ -38,6 +42,7 @@
 	],
 	"scripts": {
 		"dev": "bun run bin/sunat.ts",
+		"build": "bun run scripts/build.ts",
 		"check": "biome check --write .",
 		"test": "bun test",
 		"test:unit": "bun test tests/unit",
