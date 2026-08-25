@@ -102,6 +102,7 @@ jobs:
       - name: Verify published artifact
         working-directory: .
         env:
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.local }}
         run: |
           local_tarball="$GITHUB_WORKSPACE/.release/crafter-sunat-cli-$VERSION.tgz"
