@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import {
 	archivedAuditRecoveryPath,
-	auditEntryRuc,
+	auditEntryEmisorReference,
 	compactAuditLogs,
 	DEFAULT_AUTO_COMPACT_AFTER_MONTHS,
 	DEFAULT_RECOMMENDED_ARCHIVE_MONTHS,
@@ -52,15 +52,17 @@ export function createAuditCommand(): Command {
 				output(format, {
 					json: { entries, count: entries.length, ruc: opts.ruc || null },
 					table: {
-						headers: ["Timestamp", "RUC", "Command", "Result", "ID"],
+						headers: ["Timestamp", "Emisor ref", "Command", "Result", "ID ref"],
 						rows:
 							entries.length > 0
 								? entries.map((entry) => [
 										entry.timestamp,
-										auditEntryRuc(entry) || "-",
+										typeof auditEntryEmisorReference(entry) === "string"
+											? `${auditEntryEmisorReference(entry)?.slice(0, 19)}…`
+											: "-",
 										entry.command,
 										entry.result,
-										typeof entry.details?.id === "string" ? entry.details.id : "-",
+										typeof entry.details?.idRef === "string" ? `${entry.details.idRef.slice(0, 19)}…` : "-",
 									])
 								: [["-", opts.ruc || "-", "-", "-", "no audit entries"]],
 					},

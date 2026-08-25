@@ -1,7 +1,9 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { privateChildEnv } from "../data/child-process.ts";
+import { secureExistingFile, writePrivateFile } from "../data/private-storage.ts";
 
 /**
  * Nueva Plataforma (e-plataformaunica.sunat.gob.pe) session token, a.k.a. IdCache.
@@ -54,7 +56,10 @@ function decodeExp(jwt: string): number {
  */
 export async function captureIdCacheFromSession(): Promise<string> {
 	const requests = await new Promise<string>((resolve, reject) => {
-		const proc = spawn("agent-browser", ["--session", SESSION, "network", "requests"], { timeout: 15000 });
+		const proc = spawn("agent-browser", ["--session", SESSION, "network", "requests"], {
+			env: privateChildEnv(process.env, [], ["AGENT_BROWSER_"]),
+			timeout: 15000,
+		});
 		let out = "";
 		proc.stdout.on("data", (d: Buffer) => (out += d.toString()));
 		proc.on("close", (code) => (code === 0 ? resolve(out) : reject(new Error("network requests failed"))));
@@ -73,6 +78,7 @@ export async function captureIdCacheFromSession(): Promise<string> {
 function loadCached(): CachedToken | null {
 	if (!existsSync(CACHE_FILE)) return null;
 	try {
+		secureExistingFile(CACHE_FILE);
 		return JSON.parse(readFileSync(CACHE_FILE, "utf-8"));
 	} catch {
 		return null;
@@ -80,8 +86,7 @@ function loadCached(): CachedToken | null {
 }
 
 function saveCached(token: CachedToken): void {
-	if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
-	writeFileSync(CACHE_FILE, JSON.stringify(token, null, 2));
+	writePrivateFile(CACHE_FILE, JSON.stringify(token, null, 2));
 }
 
 /** True when a cached token exists and has more than 60s of life left. */
@@ -122,10 +127,10 @@ export async function plataformaGet(path: string): Promise<unknown> {
 	});
 	const text = await resp.text();
 	if (!resp.ok) {
-		throw new Error(`Plataforma API ${resp.status} on ${path}: ${text.slice(0, 200)}`);
+		throw new Error(`Plataforma API request failed with HTTP ${resp.status}`);
 	}
 	if (!text.trim()) {
-		throw new Error(`Plataforma API returned an empty body on ${path}`);
+		throw new Error("Plataforma API returned an empty body");
 	}
 	return JSON.parse(text);
 }

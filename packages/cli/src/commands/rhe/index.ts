@@ -1,12 +1,18 @@
+import { readFileSync } from "node:fs";
 import { Command } from "commander";
-import { getCredentials } from "../../data/config.ts";
 import { ensureSOLSession } from "../../browser/auth.ts";
+import { audit } from "../../data/audit.ts";
+import { getCredentials } from "../../data/config.ts";
+import { output, outputError } from "../../utils/output.ts";
+import {
+	sanitizePath,
+	validateEmpresa,
+	validateMedioPago,
+	validateMoneda,
+	validateMonto,
+	validateTipoDoc,
+} from "../../validation/input.ts";
 import { emitRHE, type RHEInput } from "../../workflows/rhe.ts";
-import { validateEmpresa, validateMonto, validateMoneda, validateMedioPago, validateTipoDoc } from "../../validation/input.ts";
-import { output, outputError, outputSuccess } from "../../utils/output.ts";
-import { audit, auditScreenshotPath } from "../../data/audit.ts";
-import { readFileSync } from "fs";
-import { sanitizePath } from "../../validation/input.ts";
 
 export function createRheCommand(): Command {
 	const rhe = new Command("rhe").description("Recibo por Honorarios Electronico operations");
@@ -35,8 +41,13 @@ export function createRheCommand(): Command {
 						if (dryRun) {
 							output(format, { json: { dryRun: true, input, status: "would-emit" } });
 						} else {
-							const result = await emitRHE(input, auditScreenshotPath("rhe-emit"));
-							audit({ command: "rhe emit", args: input as unknown as Record<string, unknown>, result: "success", details: result });
+							const result = await emitRHE(input);
+							audit({
+								command: "rhe emit",
+								args: input as unknown as Record<string, unknown>,
+								result: "success",
+								details: { ...result },
+							});
 							output(format, { json: { success: true, ...result } });
 						}
 					}
@@ -50,8 +61,13 @@ export function createRheCommand(): Command {
 					} else {
 						const creds = getCredentials();
 						await ensureSOLSession(creds);
-						const result = await emitRHE(input, auditScreenshotPath("rhe-emit"));
-						audit({ command: "rhe emit", args: input as unknown as Record<string, unknown>, result: "success", details: result });
+						const result = await emitRHE(input);
+						audit({
+							command: "rhe emit",
+							args: input as unknown as Record<string, unknown>,
+							result: "success",
+							details: { ...result },
+						});
 						output(format, { json: { success: true, ...result } });
 					}
 				} else {
@@ -102,7 +118,9 @@ function parseCSV(csv: string): Record<string, string>[] {
 	return lines.slice(1).map((line) => {
 		const values = line.split(",").map((v) => v.trim());
 		const obj: Record<string, string> = {};
-		headers.forEach((h, i) => (obj[h] = values[i] || ""));
+		headers.forEach((h, i) => {
+			obj[h] = values[i] || "";
+		});
 		return obj;
 	});
 }

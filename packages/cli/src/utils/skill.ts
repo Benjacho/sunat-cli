@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import * as p from "@clack/prompts";
+import { privateChildEnv } from "../data/child-process.ts";
 
 const SKILL_DIR = join(process.env.HOME || "", ".claude", "skills", "sunat-cli");
 const SKILL_MD = join(SKILL_DIR, "SKILL.md");
@@ -23,6 +24,14 @@ export async function installSkill(isTTY: boolean): Promise<boolean> {
 
 	try {
 		const proc = Bun.spawn(["npx", "skills", "add", "Railly/sunat-cli", "-g"], {
+			env: privateChildEnv(process.env, [
+				"HTTPS_PROXY",
+				"HTTP_PROXY",
+				"NO_PROXY",
+				"NPM_CONFIG_CAFILE",
+				"NPM_CONFIG_REGISTRY",
+				"NPM_CONFIG_STRICT_SSL",
+			]),
 			stdin: "inherit",
 			stdout: "inherit",
 			stderr: "inherit",

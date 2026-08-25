@@ -86,12 +86,11 @@ export async function getAccessToken(creds: OAuthCredentials): Promise<string> {
 	});
 
 	if (!resp.ok) {
-		const text = await resp.text();
-		throw new Error(`SUNAT OAuth ${resp.status}: ${text.slice(0, 300)}`);
+		throw new Error(`SUNAT OAuth request failed with HTTP ${resp.status}`);
 	}
 
 	const json = (await resp.json()) as { access_token: string; token_type: string; expires_in: number };
-	if (!json.access_token) throw new Error(`SUNAT OAuth response missing access_token: ${JSON.stringify(json)}`);
+	if (!json.access_token) throw new Error("SUNAT OAuth response missing access_token");
 
 	const token: CachedToken = {
 		accessToken: json.access_token,
@@ -147,7 +146,7 @@ export async function callRestApi<T = unknown>(opts: RestRequestOptions): Promis
 
 	const text = await resp.text();
 	if (!resp.ok) {
-		throw new Error(`SUNAT API ${resp.status} on ${opts.path}: ${text.slice(0, 500)}`);
+		throw new Error(`SUNAT API request failed with HTTP ${resp.status}`);
 	}
 
 	if (!text) return undefined as T;

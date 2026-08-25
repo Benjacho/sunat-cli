@@ -14,8 +14,8 @@
  *   prod: https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService
  */
 
-import { unzipNested, zipSingleFile } from "./zip.ts";
 import { type CdrResponse, parseCdr } from "./cdr.ts";
+import { unzipNested, zipSingleFile } from "./zip.ts";
 
 export type SunatMode = "beta" | "prod";
 
@@ -42,7 +42,12 @@ function escapeXml(s: string): string {
 	return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export function buildSendBillEnvelope(args: { username: string; password: string; filename: string; zipBase64: string }): string {
+export function buildSendBillEnvelope(args: {
+	username: string;
+	password: string;
+	filename: string;
+	zipBase64: string;
+}): string {
 	return `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://service.sunat.gob.pe" xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
   <soapenv:Header>
     <wsse:Security>
@@ -61,7 +66,12 @@ export function buildSendBillEnvelope(args: { username: string; password: string
 </soapenv:Envelope>`;
 }
 
-export function buildSendSummaryEnvelope(args: { username: string; password: string; filename: string; zipBase64: string }): string {
+export function buildSendSummaryEnvelope(args: {
+	username: string;
+	password: string;
+	filename: string;
+	zipBase64: string;
+}): string {
 	return `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://service.sunat.gob.pe" xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
   <soapenv:Header>
     <wsse:Security>
@@ -138,10 +148,10 @@ async function postSoap(url: string, envelope: string): Promise<string> {
 	const body = await resp.text();
 	if (!resp.ok) {
 		const fault = extractFault(body);
-		throw new Error(`SUNAT HTTP ${resp.status}: ${fault ? `${fault.code} — ${fault.message}` : body.slice(0, 500)}`);
+		throw new Error(`SUNAT SOAP request failed with HTTP ${resp.status}${fault ? ` (${fault.code})` : ""}`);
 	}
 	const fault = extractFault(body);
-	if (fault) throw new Error(`SUNAT SOAP Fault: ${fault.code} — ${fault.message}`);
+	if (fault) throw new Error(`SUNAT SOAP Fault: ${fault.code}`);
 	if (!body.trim()) {
 		throw new Error(
 			`SUNAT returned HTTP ${resp.status} with an empty body from ${url}. Production rejects malformed or unauthenticated requests this way instead of returning a SOAP Fault; check the WSSE username (RUC + SOL user) and password.`,
@@ -163,7 +173,7 @@ export async function sendBill(args: SendBillArgs): Promise<SendBillResult> {
 	const body = await postSoap(SUNAT_ENDPOINTS_FAC[args.mode], envelope);
 	const appResponseB64 = extractApplicationResponseBase64(body);
 	if (!appResponseB64) {
-		throw new Error(`SUNAT response did not contain applicationResponse. Body: ${body.slice(0, 500)}`);
+		throw new Error("SUNAT response did not contain applicationResponse");
 	}
 
 	const cdrZipBuffer = Buffer.from(appResponseB64, "base64");
@@ -196,7 +206,7 @@ export async function sendSummary(args: SendSummaryArgs): Promise<SendSummaryRes
 	});
 	const body = await postSoap(SUNAT_ENDPOINTS_FAC[args.mode], envelope);
 	const ticket = extractTicket(body);
-	if (!ticket) throw new Error(`SUNAT sendSummary did not return a ticket. Body: ${body.slice(0, 500)}`);
+	if (!ticket) throw new Error("SUNAT sendSummary did not return a ticket");
 	return { ticket };
 }
 
@@ -219,7 +229,11 @@ export interface GetStatusArgs {
  *  - state="rejected" when SUNAT rejected the summary (statusCode 99) — cdr present with errors
  */
 export async function getStatus(args: GetStatusArgs): Promise<GetStatusOutcome> {
-	const envelope = buildGetStatusEnvelope({ username: args.wsUsername, password: args.wsPassword, ticket: args.ticket });
+	const envelope = buildGetStatusEnvelope({
+		username: args.wsUsername,
+		password: args.wsPassword,
+		ticket: args.ticket,
+	});
 	const body = await postSoap(SUNAT_ENDPOINTS_FAC[args.mode], envelope);
 	const statusCode = extractStatusCode(body) || "";
 	const content = extractStatusContent(body);
@@ -230,12 +244,10 @@ export async function getStatus(args: GetStatusArgs): Promise<GetStatusOutcome> 
 	}
 
 	const cdrZipBuffer = Buffer.from(content, "base64");
-	// SUNAT puts a plain-text reason in <content> for error codes instead of a
-	// base64 CDR zip (e.g. statusCode 0127 -> "El ticket no existe"). Decoding
-	// that as base64 yields garbage, so surface the reason instead of failing
-	// inside the unzip with "not a zip file".
+	// SUNAT can put plain text in <content> for error codes instead of a base64
+	// CDR zip. Do not expose that server-controlled content in CLI output.
 	if (cdrZipBuffer.subarray(0, 2).toString("ascii") !== "PK") {
-		throw new Error(`SUNAT getStatus ${statusCode}: ${content.trim()}`);
+		throw new Error(`SUNAT getStatus ${statusCode || "unknown"} returned non-CDR content`);
 	}
 	const { xml: cdrXml } = await unzipNested(cdrZipBuffer);
 	const cdr = parseCdr(cdrXml);
@@ -273,14 +285,21 @@ export async function pollStatus(opts: PollStatusOptions): Promise<GetStatusOutc
 
 	while (Date.now() - start < timeoutMs) {
 		attempt += 1;
-		const outcome = await getStatus({ mode: opts.mode, wsUsername: opts.wsUsername, wsPassword: opts.wsPassword, ticket: opts.ticket });
+		const outcome = await getStatus({
+			mode: opts.mode,
+			wsUsername: opts.wsUsername,
+			wsPassword: opts.wsPassword,
+			ticket: opts.ticket,
+		});
 		opts.onTick?.(attempt, outcome.state);
 		if (outcome.state !== "processing") return outcome;
 		await sleep(delay);
 		delay = Math.min(delay * 2, maxDelayMs);
 	}
 
-	throw new Error(`SUNAT getStatus timeout after ${Math.round((Date.now() - start) / 1000)}s for ticket ${opts.ticket}`);
+	throw new Error(
+		`SUNAT getStatus timeout after ${Math.round((Date.now() - start) / 1000)}s for ticket ${opts.ticket}`,
+	);
 }
 
 function sleep(ms: number): Promise<void> {

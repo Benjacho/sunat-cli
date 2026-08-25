@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { join } from "path";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { missingSecretMessage, resolveSecret } from "./keychain.ts";
+import { ensurePrivateDir, secureExistingFile, writePrivateFile } from "./private-storage.ts";
 
 const SUNAT_DIR = join(process.env.HOME || "", ".sunat");
 const CONFIG_FILE = join(SUNAT_DIR, "config.json");
@@ -12,24 +13,35 @@ export interface SunatConfig {
 	ruc?: string;
 	usuario?: string;
 	apiClientId?: string;
-	apiClientSecret?: string;
+}
+
+function sanitizeConfig(config: Record<string, unknown>): SunatConfig {
+	return {
+		...(typeof config.ruc === "string" ? { ruc: config.ruc } : {}),
+		...(typeof config.usuario === "string" ? { usuario: config.usuario } : {}),
+		...(typeof config.apiClientId === "string" ? { apiClientId: config.apiClientId } : {}),
+	};
 }
 
 export function ensureDirs(): void {
-	for (const dir of [SUNAT_DIR, API_DIR, SESSIONS_DIR, AUDIT_DIR, join(AUDIT_DIR, "screenshots")]) {
-		if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+	for (const dir of [SUNAT_DIR, API_DIR, SESSIONS_DIR, AUDIT_DIR]) {
+		ensurePrivateDir(dir);
 	}
+	secureExistingFile(CONFIG_FILE);
 }
 
 export function loadConfig(): SunatConfig {
 	ensureDirs();
 	if (!existsSync(CONFIG_FILE)) return {};
-	return JSON.parse(readFileSync(CONFIG_FILE, "utf-8"));
+	const raw = JSON.parse(readFileSync(CONFIG_FILE, "utf-8")) as Record<string, unknown>;
+	const config = sanitizeConfig(raw);
+	if (Object.keys(raw).some((key) => !["ruc", "usuario", "apiClientId"].includes(key))) saveConfig(config);
+	return config;
 }
 
 export function saveConfig(config: SunatConfig): void {
 	ensureDirs();
-	writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+	writePrivateFile(CONFIG_FILE, JSON.stringify(sanitizeConfig(config as Record<string, unknown>), null, 2));
 }
 
 export function getCredentials(): { ruc: string; usuario: string; password: string } {
@@ -39,7 +51,8 @@ export function getCredentials(): { ruc: string; usuario: string; password: stri
 	const password = resolveSecret(["SUNAT_PASSWORD"]);
 
 	if (!ruc) throw new Error("RUC not configured. Set SUNAT_RUC env var or run: sunat config set ruc <value>");
-	if (!usuario) throw new Error("Usuario not configured. Set SUNAT_USER env var or run: sunat config set usuario <value>");
+	if (!usuario)
+		throw new Error("Usuario not configured. Set SUNAT_USER env var or run: sunat config set usuario <value>");
 	if (!password) throw new Error(missingSecretMessage(["SUNAT_PASSWORD"], "Password"));
 
 	return { ruc, usuario, password };
@@ -51,7 +64,9 @@ export function getApiCredentials(): { clientId: string; clientSecret: string } 
 	const clientSecret = resolveSecret(["SUNAT_API_CLIENT_SECRET"]);
 
 	if (!clientId || !clientSecret) {
-		throw new Error("API credentials not configured. Set SUNAT_API_CLIENT_ID env var and SUNAT_API_CLIENT_SECRET env var or keychain secret");
+		throw new Error(
+			"API credentials not configured. Set SUNAT_API_CLIENT_ID env var and SUNAT_API_CLIENT_SECRET env var or keychain secret",
+		);
 	}
 
 	return { clientId, clientSecret };
@@ -65,6 +80,4 @@ export const paths = {
 	auditDir: AUDIT_DIR,
 	solSession: join(SESSIONS_DIR, "sol.json"),
 	nuevaPlataformaSession: join(SESSIONS_DIR, "nueva-plataforma.json"),
-	apiToken: join(API_DIR, "token.json"),
-	apiClient: join(API_DIR, "client.json"),
 } as const;

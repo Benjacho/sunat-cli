@@ -5,7 +5,7 @@ Contributions are welcome. Start with an issue labeled [`good first issue`](http
 ## Setup
 
 ```bash
-bun install --frozen-lockfile
+npm ci
 bun test packages/cli/tests/unit
 bun test packages/cli/tests/e2e
 bun run packages/cli/bin/sunat.ts -o json cpe doctor

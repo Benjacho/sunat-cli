@@ -19,7 +19,7 @@
  *   3. Download generated file by name
  */
 
-import { type OAuthCredentials, callRestApi, getAccessToken } from "./oauth.ts";
+import { callRestApi, getAccessToken, type OAuthCredentials } from "./oauth.ts";
 import { tusUpload } from "./tus.ts";
 
 /** Catálogo SUNAT de libros */
@@ -104,9 +104,10 @@ export interface TicketResponse {
 }
 
 export async function descargarPropuesta(opts: DescargarOpts, creds: OAuthCredentials): Promise<string> {
-	const path = opts.codLibro === COD_LIBRO.rvie
-		? `/contribuyente/migeigv/libros/rvierce/gestionprocesosmasivos/web/masivo/exportapropuesta`
-		: `/contribuyente/migeigv/libros/rce/propuesta/web/propuesta/${opts.perTributario}/exportacioncomprobantepropuesta`;
+	const path =
+		opts.codLibro === COD_LIBRO.rvie
+			? `/contribuyente/migeigv/libros/rvierce/gestionprocesosmasivos/web/masivo/exportapropuesta`
+			: `/contribuyente/migeigv/libros/rce/propuesta/web/propuesta/${opts.perTributario}/exportacioncomprobantepropuesta`;
 
 	const r = await callRestApi<TicketResponse>({
 		creds,
@@ -179,12 +180,11 @@ export interface DescargarArchivoOpts {
 	codProceso?: string; // tipo de proceso, depende del archivo origen
 }
 
-export async function descargarArchivo(
-	opts: DescargarArchivoOpts,
-	creds: OAuthCredentials,
-): Promise<Buffer> {
+export async function descargarArchivo(opts: DescargarArchivoOpts, creds: OAuthCredentials): Promise<Buffer> {
 	const token = await import("./oauth.ts").then((m) => m.getAccessToken(creds));
-	const url = new URL(`https://api-sire.sunat.gob.pe/v1/contribuyente/migeigv/libros/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte`);
+	const url = new URL(
+		`https://api-sire.sunat.gob.pe/v1/contribuyente/migeigv/libros/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte`,
+	);
 	url.searchParams.set("nomArchivoReporte", opts.nomArchivoReporte);
 	url.searchParams.set("codTipoArchivoReporte", opts.codTipoArchivoReporte);
 	url.searchParams.set("codLibro", opts.codLibro);
@@ -193,8 +193,7 @@ export async function descargarArchivo(
 
 	const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 	if (!resp.ok) {
-		const text = await resp.text();
-		throw new Error(`SUNAT SIRE descargarArchivo HTTP ${resp.status}: ${text.slice(0, 300)}`);
+		throw new Error(`SUNAT SIRE descargarArchivo failed with HTTP ${resp.status}`);
 	}
 	const ab = await resp.arrayBuffer();
 	return Buffer.from(ab);
@@ -208,7 +207,10 @@ export interface AceptarPropuestaResult {
 	numTicket: string;
 }
 
-export async function aceptarPropuestaRvie(perTributario: string, creds: OAuthCredentials): Promise<AceptarPropuestaResult> {
+export async function aceptarPropuestaRvie(
+	perTributario: string,
+	creds: OAuthCredentials,
+): Promise<AceptarPropuestaResult> {
 	const path = `/contribuyente/migeigv/libros/rvie/propuesta/web/propuesta/${perTributario}/aceptapropuesta`;
 	const r = await callRestApi<AceptarPropuestaResult>({
 		creds,
@@ -270,7 +272,11 @@ export async function pollTicket(opts: PollTicketOpts): Promise<PollTicketResult
 		await sleep(delay);
 		delay = Math.min(delay * 2, maxDelay);
 	}
-	return { state: "still-processing", statusCode: "98", statusDesc: `Timeout after ${Math.round((Date.now() - start) / 1000)}s` };
+	return {
+		state: "still-processing",
+		statusCode: "98",
+		statusDesc: `Timeout after ${Math.round((Date.now() - start) / 1000)}s`,
+	};
 }
 
 function sleep(ms: number): Promise<void> {
@@ -309,7 +315,8 @@ const SIRE_UPLOAD_PATHS = {
 	importarPropuestaCp: "/contribuyente/migeigv/libros/rvierce/receptorpropuesta/web/propuesta/upload",
 	importarPreliminarCp: "/contribuyente/migeigv/libros/rvierce/receptorpreliminar/web/preliminar/upload",
 	ajustesPosteriores: "/contribuyente/migeigv/libros/rvierce/receptorajustesposteriores/web/ajustesposteriores/upload",
-	ajustesPosterioresAnteriores: "/contribuyente/migeigv/libros/rvierce/receptorajustesposteriores/web/ajustesposteriores/upload",
+	ajustesPosterioresAnteriores:
+		"/contribuyente/migeigv/libros/rvierce/receptorajustesposteriores/web/ajustesposteriores/upload",
 } as const;
 
 export type SireUploadKind = keyof typeof SIRE_UPLOAD_PATHS;

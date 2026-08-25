@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { TUS_VERSION, encodeMetadata, tusCreate, tusHead, tusPatch, tusUpload } from "../../src/sunat-rest/tus.ts";
+import { encodeMetadata, TUS_VERSION, tusCreate, tusHead, tusPatch, tusUpload } from "../../src/sunat-rest/tus.ts";
 
 const ORIGINAL_FETCH = global.fetch;
 
@@ -80,24 +80,28 @@ describe("tusCreate", () => {
 		expect(r.uploadUrl).toBe("https://api-sire.sunat.gob.pe/v1/upload/relative-id");
 	});
 
-	test("throws on non-201 status with body excerpt", async () => {
-		mockFetch(async () => new Response("payload too large", { status: 413 }));
-		expect(
-			tusCreate({ endpoint: "https://x", uploadLength: 1, metadata: {}, bearerToken: "tk" }),
-		).rejects.toThrow(/TUS create failed: HTTP 413/);
+	test("throws on non-201 status without exposing the response body", async () => {
+		mockFetch(async () => new Response("private server detail", { status: 413 }));
+		const error = await tusCreate({ endpoint: "https://x", uploadLength: 1, metadata: {}, bearerToken: "tk" }).catch(
+			(value) => value,
+		);
+		expect(error.message).toContain("HTTP 413");
+		expect(error.message).not.toContain("private server detail");
 	});
 
 	test("throws when Location header is missing", async () => {
 		mockFetch(async () => new Response(null, { status: 201 }));
-		expect(
-			tusCreate({ endpoint: "https://x", uploadLength: 1, metadata: {}, bearerToken: "tk" }),
-		).rejects.toThrow(/missing Location header/);
+		expect(tusCreate({ endpoint: "https://x", uploadLength: 1, metadata: {}, bearerToken: "tk" })).rejects.toThrow(
+			/missing Location header/,
+		);
 	});
 });
 
 describe("tusHead", () => {
 	test("reads Upload-Offset", async () => {
-		mockFetch(async () => new Response(null, { status: 200, headers: { "Upload-Offset": "1024", "Upload-Length": "4096" } }));
+		mockFetch(
+			async () => new Response(null, { status: 200, headers: { "Upload-Offset": "1024", "Upload-Length": "4096" } }),
+		);
 		const r = await tusHead("https://x/upload/123", "tk");
 		expect(r.uploadOffset).toBe(1024);
 		expect(r.uploadLength).toBe(4096);
@@ -132,10 +136,15 @@ describe("tusPatch", () => {
 	});
 
 	test("throws on non-204 status", async () => {
-		mockFetch(async () => new Response("conflict", { status: 409 }));
-		expect(
-			tusPatch({ uploadUrl: "https://x", chunk: Buffer.alloc(1), offset: 0, bearerToken: "tk" }),
-		).rejects.toThrow(/TUS patch failed at offset 0: HTTP 409/);
+		mockFetch(async () => new Response("private server detail", { status: 409 }));
+		const error = await tusPatch({
+			uploadUrl: "https://x",
+			chunk: Buffer.alloc(1),
+			offset: 0,
+			bearerToken: "tk",
+		}).catch((value) => value);
+		expect(error.message).toContain("HTTP 409");
+		expect(error.message).not.toContain("private server detail");
 	});
 });
 

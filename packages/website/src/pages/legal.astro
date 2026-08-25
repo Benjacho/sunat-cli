@@ -115,10 +115,10 @@
 				(<code>*.sunat.gob.pe</code>).
 			</p>
 			<ul>
-				<li>Credentials stored locally in <code>~/.sunat/</code> (encrypted)</li>
-				<li>Audit logs stored locally in JSONL format</li>
-				<li>OAuth2 tokens cached locally with 1-hour TTL</li>
-				<li>No analytics, telemetry, or external data transmission</li>
+				<li>Secrets stored in the OS keychain, with non-secret account configuration under <code>~/.sunat/</code></li>
+				<li>Minimized audit logs stored locally with owner-only permissions</li>
+				<li>Selected short-lived API session tokens cached locally with owner-only permissions</li>
+				<li>No analytics or telemetry; tax operations transmit only to official SUNAT endpoints</li>
 			</ul>
 			<div class="legal-ref">
 				Ley 29733 — Ley de Proteccion de Datos Personales: All personal data
@@ -166,9 +166,5 @@
 			<a href="/">sunat-cli</a> — <a href="https://crafterstation.com">Crafter Station</a>, Lima, Peru
 		</footer>
 
-		<script>
-			import { inject } from "@vercel/analytics";
-			inject();
-		</script>
 	</body>
 </html>

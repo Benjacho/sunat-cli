@@ -3,6 +3,10 @@
 Findings from reverse-engineering SUNAT's web portals (March 25, 2026).
 Everything here was discovered via live recon with agent-browser v0.22.2.
 
+This is a historical research dossier, not an operations guide. Current CLI
+security rules take precedence: never pass secrets in flags, never persist
+tokens or client secrets, and never retain portal screenshots by default.
+
 ---
 
 ## Portal Map
@@ -225,13 +229,9 @@ Network call on save: `POST https://api.sunat.gob.pe/v1/tecnologia/controlacceso
 
 ### OAuth2 Token Generation
 
-```bash
-curl -X POST "https://api-seguridad.sunat.gob.pe/v1/clientessol/{client_id}/oauth2/token/" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=password&scope=https://api.sunat.gob.pe/v1/contribuyente/gem&client_id={client_id}&client_secret={client_secret}&username={RUC}{SOL_USER}&password={SOL_PASSWORD}"
-```
-
-Response: `{ "access_token": "eyJ...", "token_type": "JWT", "expires_in": 3600 }`
+The CLI performs the OAuth password grant internally. Supply secrets through
+environment variables or the OS keychain. It validates token metadata without
+printing or persisting the bearer token.
 
 The JWT payload contains the API base URLs:
 - `https://api-cpe.sunat.gob.pe` — CPE endpoints (controlcpe, controlmsg, gem)
@@ -305,10 +305,10 @@ SUNAT's date pickers intercept "/" and open a calendar popup. Two approaches:
 | `~/.sunat/config.json` | RUC, usuario, preferences |
 | `~/.sunat/sessions/sol.json` | SOL session state |
 | `~/.sunat/sessions/nueva-plataforma.json` | Nueva Plataforma session |
-| `~/.sunat/api/client.json` | OAuth2 client_id + secret |
-| `~/.sunat/api/token.json` | Cached JWT |
-| `~/.sunat/audit/YYYY-MM-DD.jsonl` | Operation audit trail |
-| `~/.sunat/recon/` | Screenshots, snapshots, network logs from exploration |
+| `~/.sunat/audit/YYYY-MM.jsonl` | Minimized operation audit trail |
+
+Secrets live in the OS keychain or process environment. Browser session files
+are owner-only and contain authentication state, so treat them as secrets.
 
 ---
 

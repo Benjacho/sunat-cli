@@ -1,24 +1,36 @@
-import { execSync, spawn } from "child_process";
+import { execSync, spawn } from "node:child_process";
+import { privateChildEnv } from "../data/child-process.ts";
+
+const childEnv = () => privateChildEnv(process.env, [], ["AGENT_BROWSER_"]);
 
 async function getCdpUrl(): Promise<string> {
 	return new Promise((resolve, reject) => {
-		const proc = spawn("agent-browser", ["--session", "sunat", "get", "cdp-url"]);
+		const proc = spawn("agent-browser", ["--session", "sunat", "get", "cdp-url"], { env: childEnv() });
 		let out = "";
 		proc.stdout.on("data", (d: Buffer) => (out += d.toString()));
-		proc.on("close", (code) => (code === 0 ? resolve(out.trim().replace(/\x1b\[[0-9;]*m/g, "")) : reject(new Error("get cdp-url failed"))));
+		proc.on("close", (code) =>
+			code === 0
+				? resolve(out.trim().replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g"), ""))
+				: reject(new Error("get cdp-url failed")),
+		);
 		proc.on("error", reject);
 	});
 }
 
+export function buildSetInputValueScript(elementId: string, value: string): string {
+	return `(function(){ var el = document.getElementById(${JSON.stringify(elementId)}); if (!el) return 'not_found'; var ns = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; ns.call(el, ${JSON.stringify(value)}); el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); el.dispatchEvent(new Event('blur', {bubbles:true})); return 'SET:' + el.value; })()`;
+}
+
 export async function setInputValueInIframe(elementId: string, value: string): Promise<boolean> {
 	const cdpUrl = await getCdpUrl();
-	const escapedValue = value.replace(/'/g, "\\'");
-	const script = `(function(){ var el = document.getElementById('${elementId}'); if (!el) return 'not_found'; var ns = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; ns.call(el, '${escapedValue}'); el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); el.dispatchEvent(new Event('blur', {bubbles:true})); return 'SET:' + el.value; })()`;
+	const script = buildSetInputValueScript(elementId, value);
 
 	return new Promise((resolve, reject) => {
 		const ws = new WebSocket(cdpUrl);
-		const timeout = setTimeout(() => { ws.close(); reject(new Error("CDP timeout")); }, 20000);
-		let id = 1;
+		const timeout = setTimeout(() => {
+			ws.close();
+			reject(new Error("CDP timeout"));
+		}, 20000);
 		let sessionId = "";
 
 		ws.onmessage = (event) => {
@@ -27,8 +39,17 @@ export async function setInputValueInIframe(elementId: string, value: string): P
 			// Step 1 response: targets list
 			if (data.id === 1) {
 				const page = data.result?.targetInfos?.find((t: any) => t.url?.includes("sunat") && t.type === "page");
-				if (!page) { done(false, "No SUNAT page"); return; }
-				ws.send(JSON.stringify({ id: 2, method: "Target.attachToTarget", params: { targetId: page.targetId, flatten: true } }));
+				if (!page) {
+					done(false, "No SUNAT page");
+					return;
+				}
+				ws.send(
+					JSON.stringify({
+						id: 2,
+						method: "Target.attachToTarget",
+						params: { targetId: page.targetId, flatten: true },
+					}),
+				);
 			}
 
 			// Step 2 response: attached
@@ -41,23 +62,27 @@ export async function setInputValueInIframe(elementId: string, value: string): P
 			if (data.id === 3 && data.result?.frameTree) {
 				const frames = flattenFrames(data.result.frameTree);
 				for (let i = 0; i < frames.length; i++) {
-					ws.send(JSON.stringify({
-						id: 10 + i,
-						method: "Page.createIsolatedWorld",
-						sessionId,
-						params: { frameId: frames[i].id, worldName: "sunat-cli" },
-					}));
+					ws.send(
+						JSON.stringify({
+							id: 10 + i,
+							method: "Page.createIsolatedWorld",
+							sessionId,
+							params: { frameId: frames[i].id, worldName: "sunat-cli" },
+						}),
+					);
 				}
 			}
 
 			// Step 4: isolated world created → evaluate
 			if (data.id >= 10 && data.id < 50 && data.result?.executionContextId) {
-				ws.send(JSON.stringify({
-					id: 100 + data.id,
-					method: "Runtime.evaluate",
-					sessionId,
-					params: { expression: script, contextId: data.result.executionContextId, returnByValue: true },
-				}));
+				ws.send(
+					JSON.stringify({
+						id: 100 + data.id,
+						method: "Runtime.evaluate",
+						sessionId,
+						params: { expression: script, contextId: data.result.executionContextId, returnByValue: true },
+					}),
+				);
 			}
 
 			// Step 5: evaluate result
@@ -90,7 +115,6 @@ function flattenFrames(tree: any): any[] {
 	return frames;
 }
 
-
 // ---------------------------------------------------------------------------
 // Sesión CDP persistente
 //
@@ -104,7 +128,6 @@ function flattenFrames(tree: any): any[] {
 // cross-origin: `browser.evalJS` no entra y `browser.fill` escribe el valor
 // sin disparar los handlers de jQuery Validate.
 // ---------------------------------------------------------------------------
-
 
 export interface CdpSession {
 	/** Evalúa una expresión dentro del contexto del formulario. */
@@ -131,7 +154,7 @@ export async function findDebuggerPort(): Promise<number> {
 	try {
 		out = execSync(
 			`for pid in $(pgrep -f "Google Chrome" | head -8); do lsof -nP -iTCP -sTCP:LISTEN -a -p $pid 2>/dev/null | awk 'NR>1{print $9}'; done | sort -u`,
-			{ encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
+			{ encoding: "utf-8", env: childEnv(), stdio: ["ignore", "pipe", "ignore"] },
 		);
 	} catch {
 		throw new Error("No pude inspeccionar los puertos de Chrome.");
@@ -169,7 +192,9 @@ export async function connect(opts: ConnectOpts = {}): Promise<CdpSession> {
 
 	const port = await findDebuggerPort();
 	const targets = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()) as Array<{
-		type: string; url: string; webSocketDebuggerUrl: string;
+		type: string;
+		url: string;
+		webSocketDebuggerUrl: string;
 	}>;
 	const page = targets.find((t) => t.type === "page" && t.url.includes(pageUrl));
 	if (!page) throw new Error(`No encontré la pestaña del portal (busqué "${pageUrl}").`);
@@ -182,13 +207,19 @@ export async function connect(opts: ConnectOpts = {}): Promise<CdpSession> {
 	ws.addEventListener("message", (e: MessageEvent) => {
 		const m = JSON.parse(String(e.data));
 		if (m.method === "Runtime.executionContextCreated") contexts.push(m.params.context);
-		if (m.id && pending.has(m.id)) { pending.get(m.id)?.(m); pending.delete(m.id); }
+		if (m.id && pending.has(m.id)) {
+			pending.get(m.id)?.(m);
+			pending.delete(m.id);
+		}
 	});
 	await new Promise((r) => ws.addEventListener("open", r));
 
 	const send = (method: string, params: Record<string, unknown> = {}): Promise<any> => {
 		const myId = ++id;
-		return new Promise((res) => { pending.set(myId, res as (v: unknown) => void); ws.send(JSON.stringify({ id: myId, method, params })); });
+		return new Promise((res) => {
+			pending.set(myId, res as (v: unknown) => void);
+			ws.send(JSON.stringify({ id: myId, method, params }));
+		});
 	};
 
 	await send("Runtime.enable");
@@ -201,17 +232,28 @@ export async function connect(opts: ConnectOpts = {}): Promise<CdpSession> {
 		if (opts.probe) {
 			for (const c of candidates) {
 				const r = await send("Runtime.evaluate", { expression: opts.probe, contextId: c.id, returnByValue: true });
-				if (r.result?.result?.value) { ctx = c; break; }
+				if (r.result?.result?.value) {
+					ctx = c;
+					break;
+				}
 			}
 		} else if (candidates.length) {
 			ctx = candidates[0];
 		}
 		if (!ctx) await new Promise((r) => setTimeout(r, 500));
 	}
-	if (!ctx) { ws.close(); throw new Error(`No encontré el contexto del formulario (origin "${origin}").`); }
+	if (!ctx) {
+		ws.close();
+		throw new Error(`No encontré el contexto del formulario (origin "${origin}").`);
+	}
 
 	const evalIn = async (expression: string) => {
-		const r = await send("Runtime.evaluate", { expression, contextId: ctx.id, returnByValue: true, awaitPromise: true });
+		const r = await send("Runtime.evaluate", {
+			expression,
+			contextId: ctx.id,
+			returnByValue: true,
+			awaitPromise: true,
+		});
 		if (r.result?.exceptionDetails) {
 			const d = r.result.exceptionDetails;
 			return { err: String(d.exception?.description || d.text || "").slice(0, 240) };

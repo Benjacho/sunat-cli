@@ -1,7 +1,7 @@
-import * as browser from "./client.ts";
-import { solveReCaptcha } from "./captcha.ts";
-import { existsSync, statSync } from "fs";
+import { existsSync, statSync } from "node:fs";
 import { paths } from "../data/config.ts";
+import { solveReCaptcha } from "./captcha.ts";
+import * as browser from "./client.ts";
 
 const SOL_URL = "https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm";
 const NUEVA_PLATAFORMA_URL =
@@ -61,7 +61,7 @@ export async function loginSOL(creds: Credentials): Promise<void> {
 			await browser.stateSave(paths.solSession);
 			return;
 		}
-		throw new Error(`SOL login failed. URL: ${url}`);
+		throw new Error("SOL login failed");
 	}
 
 	await browser.stateSave(paths.solSession);

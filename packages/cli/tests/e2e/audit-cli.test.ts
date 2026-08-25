@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
-import { gunzipSync, gzipSync } from "zlib";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 const CLI = join(import.meta.dir, "..", "..", "bin", "sunat.ts");
 const tempHomes: string[] = [];
@@ -43,9 +43,18 @@ describe("sunat audit — E2E", () => {
 		const auditDir = join(home, ".sunat", "audit");
 		const currentMonth = new Date().toISOString().slice(0, 7);
 
-		writeFileSync(join(auditDir, "2000-01.jsonl"), '{"entry":"monthly-old"}\n');
-		writeFileSync(join(auditDir, "2000-01-15.jsonl"), '{"entry":"legacy-daily-old"}\n');
-		writeFileSync(join(auditDir, `${currentMonth}.jsonl`), '{"entry":"current"}\n');
+		writeFileSync(
+			join(auditDir, "2000-01.jsonl"),
+			'{"timestamp":"2000-01-01T00:00:00.000Z","command":"rhe emit","args":{"ruc":"20123456789"},"result":"success"}\n',
+		);
+		writeFileSync(
+			join(auditDir, "2000-01-15.jsonl"),
+			'{"timestamp":"2000-01-15T00:00:00.000Z","command":"f616 declare","args":{"name":"Private Person"},"result":"success"}\n',
+		);
+		writeFileSync(
+			join(auditDir, `${currentMonth}.jsonl`),
+			`{"timestamp":"${currentMonth}-01T00:00:00.000Z","command":"current","args":{},"result":"success"}\n`,
+		);
 
 		const result = await runCli(["-o", "json", "audit", "compact"], home);
 		expect(result.exitCode).toBe(0);
@@ -58,8 +67,10 @@ describe("sunat audit — E2E", () => {
 		expect(json.archivePaths).toContain(join(auditDir, "archive", "2000-01.jsonl.gz"));
 
 		const archived = gunzipSync(readFileSync(join(auditDir, "archive", "2000-01.jsonl.gz"))).toString("utf-8");
-		expect(archived).toContain("monthly-old");
-		expect(archived).toContain("legacy-daily-old");
+		expect(archived).toContain("rhe emit");
+		expect(archived).toContain("f616 declare");
+		expect(archived).not.toContain("20123456789");
+		expect(archived).not.toContain("Private Person");
 	});
 
 	test("audit prune deletes archived months strictly before the cutoff", async () => {

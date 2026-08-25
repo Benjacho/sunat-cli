@@ -13,31 +13,31 @@ Install: `npx skills add Railly/sunat-cli -g`
 
 Three ways to provide credentials (priority order):
 
-1. **Inline flags** (agent-friendly): `sunat-cli login --ruc 10XXXXXXXXX --user XXXXXXXX --password XXXXXX`
+1. **Non-secret flags**: `sunat-cli login --ruc 10XXXXXXXXX --user XXXXXXXX`
 2. **Env vars**: `SUNAT_RUC`, `SUNAT_USER`, `SUNAT_PASSWORD`
-3. **OS keychain**: `sunat keychain set SUNAT_PASSWORD --value '...'`
+3. **OS keychain**: `sunat keychain set SUNAT_PASSWORD`
 4. **Interactive prompts**: just run `sunat-cli login` and it asks step by step
 
 ```bash
-sunat-cli login --ruc 10123456789 --user MYUSER --password MYPASS
-sunat-cli login --nueva-plataforma --ruc 10123456789 --user MYUSER --password MYPASS
+sunat-cli keychain set SUNAT_PASSWORD
+sunat-cli login --ruc 10XXXXXXXXX --user MYUSER
+sunat-cli login --nueva-plataforma --ruc 10XXXXXXXXX --user MYUSER
 sunat-cli whoami
 ```
 
-RUC and usuario are saved to `~/.sunat/config.json` after first login. Password is never stored.
+RUC and usuario are saved to `~/.sunat/config.json` after first login. Password is never stored in config or another plaintext file; optional persistence uses the OS keychain.
 
 Secrets resolve as env var → OS keychain → clear error. Env vars always win, which keeps CI predictable.
 
 ```bash
-sunat keychain set CPE_CERT_PASSWORD --value 'your-pfx-password'
-sunat keychain set CPE_SOL_PASSWORD --value 'your-clave-sol'
-sunat keychain set SUNAT_API_CLIENT_SECRET --value 'your-client-secret'
-sunat keychain get CPE_CERT_PASSWORD
+sunat keychain set CPE_CERT_PASSWORD
+sunat keychain set CPE_SOL_PASSWORD
+sunat keychain set SUNAT_API_CLIENT_SECRET
 sunat keychain list
 sunat keychain clear CPE_CERT_PASSWORD
 ```
 
-macOS stores secrets through `security add-generic-password -s sunat-cli -a <KEY> -w <VALUE>`.
+macOS prompts `security add-generic-password` through stdin, with `-w` as the final argument.
 Linux stores secrets through `secret-tool` / libsecret.
 
 ### RHE (Recibo por Honorarios)
@@ -45,7 +45,7 @@ Linux stores secrets through `secret-tool` / libsecret.
 ```bash
 # Emit single RHE
 sunat rhe emit --json '{
-  "empresa": "Clerk Inc",
+  "empresa": "Cliente Ejemplo",
   "tipoDoc": "SIN DOCUMENTO",
   "descripcion": "Servicios de desarrollo de software",
   "monto": 6700,
@@ -79,9 +79,7 @@ Key rules:
 ```bash
 # Single month
 sunat f616 declare --json '{
-  "periodo": "2026-03",
-  "ingresoPEN": 25000,
-  "retenciones": 0
+  "periodo": "2026-03"
 }'
 
 # Preview
@@ -94,7 +92,7 @@ sunat f616 declare --batch --months "2025-03..2026-02"
 sunat f616 status
 ```
 
-**F616 computation**: `pagoACuenta = ingresoPEN * 0.08 - retenciones`
+SUNAT prefills income and withholdings from registered RHE. The CLI only sets the period, so verify the prefilled amounts before submitting.
 
 Key rules:
 - 4ta categoria workers only (freelancers/independent contractors)
@@ -192,8 +190,8 @@ export CPE_CERT_PASSWORD='your-pfx-password'
 export CPE_SOL_PASSWORD='your-clave-sol'
 
 # Keychain alternative for local machines
-sunat keychain set CPE_CERT_PASSWORD --value 'your-pfx-password'
-sunat keychain set CPE_SOL_PASSWORD --value 'your-clave-sol'
+sunat keychain set CPE_CERT_PASSWORD
+sunat keychain set CPE_SOL_PASSWORD
 
 # 3. Verify
 sunat cpe --driver sunat-direct doctor
@@ -397,7 +395,7 @@ scan regardless of N RUCs.
 ### API & Schema
 
 ```bash
-sunat api token              # Get/refresh OAuth2 token
+sunat api token              # Validate OAuth2 credentials without printing the token
 sunat schema rhe             # JSON schema for RHE fields
 sunat schema f616            # JSON schema for F616 fields
 sunat schema cpe-factura     # JSON schema for Factura Electronica
@@ -495,13 +493,13 @@ All commands support `--output <format>`:
 
 **Monthly routine (4ta categoria)**:
 1. `sunat login --nueva-plataforma`
-2. `sunat f616 declare --json '{"periodo":"2026-03","ingresoPEN":25000,"retenciones":0}' --dry-run`
+2. `sunat f616 declare --json '{"periodo":"2026-03"}' --dry-run`
 3. Review dry-run output
 4. Remove `--dry-run` to submit
 
-**Emit RHE for Clerk**:
+**Emit an RHE**:
 1. `sunat login`
-2. `sunat rhe emit --json '{"empresa":"Clerk Inc","tipoDoc":"SIN DOCUMENTO","descripcion":"Servicios de desarrollo de software - Marzo 2026","monto":6700,"moneda":"USD","medioPago":"TRANSFERENCIA"}'`
+2. `sunat rhe emit --json '{"empresa":"Cliente Ejemplo","tipoDoc":"SIN DOCUMENTO","descripcion":"Servicios de desarrollo de software - Marzo 2026","monto":6700,"moneda":"USD","medioPago":"TRANSFERENCIA"}'`
 3. `sunat rhe verify --month 2026-03`
 
 ## Error Handling

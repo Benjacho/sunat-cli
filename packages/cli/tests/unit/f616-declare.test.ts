@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { NATIVE_SETTER } from "../../src/browser/cdp.ts";
+import { buildSetInputValueScript, NATIVE_SETTER } from "../../src/browser/cdp.ts";
 
 describe("NATIVE_SETTER", () => {
 	test("usa el setter nativo del prototipo, no asignación directa", () => {
@@ -22,6 +22,25 @@ describe("NATIVE_SETTER", () => {
 
 	test("señala el campo ausente en vez de fallar en silencio", () => {
 		expect(NATIVE_SETTER).toContain("NO_FIELD");
+	});
+});
+
+describe("CDP input serialization", () => {
+	test("keeps quotes, slashes and line breaks inside a string literal", () => {
+		const value = "x'); globalThis.pwned = true; //\\\nnext";
+		const script = buildSetInputValueScript("field'); throw 1; //", value);
+		const calls: unknown[] = [];
+		const document = {
+			getElementById(id: string) {
+				calls.push(id);
+				return null;
+			},
+		};
+		const result = Function("document", `return ${script}`)(document);
+
+		expect(result).toBe("not_found");
+		expect(calls).toEqual(["field'); throw 1; //"]);
+		expect(globalThis).not.toHaveProperty("pwned");
 	});
 });
 
@@ -58,7 +77,7 @@ describe("partición del nombre del cliente", () => {
 	};
 
 	test("dos palabras van a paterno y materno", () => {
-		expect(partir("CLERK INC")).toEqual({ apePat: "CLERK", apeMat: "INC", nombres: "CLERK INC" });
+		expect(partir("CLIENTE EJEMPLO")).toEqual({ apePat: "CLIENTE", apeMat: "EJEMPLO", nombres: "CLIENTE EJEMPLO" });
 	});
 
 	test("una sola palabra deja el materno vacío", () => {
@@ -73,7 +92,7 @@ describe("partición del nombre del cliente", () => {
 	});
 
 	test("tolera espacios de más", () => {
-		expect(partir("  CLERK   INC  ").apePat).toBe("CLERK");
+		expect(partir("  CLIENTE   EJEMPLO  ").apePat).toBe("CLIENTE");
 	});
 });
 

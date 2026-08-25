@@ -46,7 +46,7 @@
 ## Install
 
 ```bash
-bun add -g @crafter/sunat-cli
+npm install -g @crafter/sunat-cli
 ```
 
 Run `sunat-cli --help` after installing. That list is the contract: every command
@@ -138,7 +138,7 @@ Secrets resolve from the environment first, then the OS keychain. Existing
 env-var setups keep working unchanged.
 
 ```bash
-# Omit --value on a terminal and it prompts without echo, so the secret
+# Run on a terminal and it prompts without echo, so the secret
 # never lands in shell history
 sunat-cli keychain set CPE_CERT_PASSWORD
 sunat-cli keychain list
@@ -196,7 +196,7 @@ sunat-cli f616 oficios
 # Fill the web form itself (T2). Needs the F616 open in the browser.
 sunat-cli f616 declarar estado
 sunat-cli f616 declarar periodo 2025-11
-sunat-cli f616 declarar ingreso --fecha 17/11/2025 --monto 21054 --cliente "CLERK INC"
+sunat-cli f616 declarar ingreso --fecha 17/11/2025 --monto 21054 --cliente "CLIENTE EJEMPLO"
 sunat-cli f616 declarar bandeja
 sunat-cli f616 declarar constancias --dir ~/Downloads/constancias
 ```

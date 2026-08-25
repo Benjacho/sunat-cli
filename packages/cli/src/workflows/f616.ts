@@ -1,5 +1,5 @@
-import * as browser from "../browser/client.ts";
 import { setInputValueInIframe } from "../browser/cdp.ts";
+import * as browser from "../browser/client.ts";
 import { getCredentials } from "../data/config.ts";
 
 export interface F616Input {
@@ -13,7 +13,6 @@ export interface F616Result {
 	ingresoBruto?: number;
 	retencion4ta?: number;
 	pagoACuenta?: number;
-	screenshot?: string;
 }
 
 const NUEVA_PLATAFORMA_URL = "https://e-menu.sunat.gob.pe/cl-ti-itmenu2/MenuInternetPlataforma.htm?exe=55.1.1.1.1";
@@ -40,7 +39,7 @@ export async function loginNuevaPlataforma(): Promise<void> {
 
 	const url = await browser.getUrl();
 	if (!url.includes("pestana")) {
-		throw new Error(`Nueva Plataforma login failed. URL: ${url}`);
+		throw new Error("Nueva Plataforma login failed");
 	}
 }
 
@@ -56,7 +55,7 @@ export async function navigateToF616(): Promise<void> {
 	}
 }
 
-export async function declareF616(input: F616Input, screenshotPath?: string): Promise<F616Result> {
+export async function declareF616(input: F616Input): Promise<F616Result> {
 	// The form opens behind a "Sr. Contribuyente" notice whose button is
 	// labelled "Close", not "Aceptar". Left open, its modal-backdrop covers the
 	// form: a real click on the periodo field is refused as covered, and every
@@ -120,10 +119,6 @@ export async function declareF616(input: F616Input, screenshotPath?: string): Pr
 		await browser.sleep(3000);
 	}
 
-	if (screenshotPath) {
-		await browser.screenshot(screenshotPath);
-	}
-
 	snap = await browser.snapshot({ interactive: true });
 
 	// Navigate back to F616 list for next declaration
@@ -131,7 +126,6 @@ export async function declareF616(input: F616Input, screenshotPath?: string): Pr
 
 	return {
 		periodo: input.periodo,
-		screenshot: screenshotPath,
 	};
 }
 
@@ -143,7 +137,7 @@ export async function ensureNuevaPlataformaAndF616(): Promise<void> {
 		await browser.open("https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm", { headed: true });
 		await browser.sleep(3000);
 
-		let snap = await browser.snapshot({ interactive: true });
+		const snap = await browser.snapshot({ interactive: true });
 		if (!snap.includes("Bienvenido")) {
 			const rucRef = findRef(snap, "RUC", "textbox");
 			const userRef = findRef(snap, "Usuario", "textbox");

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { SCOPES, SUNAT_REST_BASES, callRestApi, clearTokenCache, getAccessToken } from "../../src/sunat-rest/oauth.ts";
+import { callRestApi, clearTokenCache, getAccessToken, SCOPES, SUNAT_REST_BASES } from "../../src/sunat-rest/oauth.ts";
 
 const ORIGINAL_FETCH = global.fetch;
 
@@ -72,14 +72,18 @@ describe("getAccessToken", () => {
 		expect(calls).toBe(2);
 	});
 
-	test("throws on non-200 with body excerpt", async () => {
-		mockFetch(async () => new Response("invalid client", { status: 401 }));
-		expect(getAccessToken({ clientId: "cid", clientSecret: "csec" })).rejects.toThrow(/SUNAT OAuth 401/);
+	test("throws on non-200 without exposing the response body", async () => {
+		mockFetch(async () => new Response("private server detail", { status: 401 }));
+		const error = await getAccessToken({ clientId: "cid", clientSecret: "csec" }).catch((value) => value);
+		expect(error.message).toContain("HTTP 401");
+		expect(error.message).not.toContain("private server detail");
 	});
 
 	test("throws on missing access_token in response", async () => {
-		mockFetch(async () => new Response(JSON.stringify({ error: "invalid_grant" }), { status: 200 }));
-		expect(getAccessToken({ clientId: "cid", clientSecret: "csec" })).rejects.toThrow(/access_token/);
+		mockFetch(async () => new Response(JSON.stringify({ error: "private server detail" }), { status: 200 }));
+		const error = await getAccessToken({ clientId: "cid", clientSecret: "csec" }).catch((value) => value);
+		expect(error.message).toContain("access_token");
+		expect(error.message).not.toContain("private server detail");
 	});
 
 	test("uses custom scope when provided", async () => {
@@ -119,7 +123,8 @@ describe("callRestApi", () => {
 	test("appends query params", async () => {
 		let seenUrl = "";
 		mockFetch(async (url) => {
-			if (url.includes("token")) return new Response(JSON.stringify({ access_token: "x", expires_in: 3600 }), { status: 200 });
+			if (url.includes("token"))
+				return new Response(JSON.stringify({ access_token: "x", expires_in: 3600 }), { status: 200 });
 			seenUrl = url;
 			return new Response("{}", { status: 200 });
 		});
@@ -153,13 +158,17 @@ describe("callRestApi", () => {
 		expect(tokenCalls).toBe(2);
 	});
 
-	test("throws on non-401 error with status + path", async () => {
+	test("throws on non-401 error without exposing path or response body", async () => {
 		mockFetch(async (url) => {
-			if (url.includes("token")) return new Response(JSON.stringify({ access_token: "x", expires_in: 3600 }), { status: 200 });
-			return new Response("not found", { status: 404 });
+			if (url.includes("token"))
+				return new Response(JSON.stringify({ access_token: "x", expires_in: 3600 }), { status: 200 });
+			return new Response("private server detail", { status: 404 });
 		});
-		expect(
-			callRestApi({ creds: { clientId: "c", clientSecret: "s" }, path: "/x" }),
-		).rejects.toThrow(/SUNAT API 404 on \/x/);
+		const error = await callRestApi({ creds: { clientId: "c", clientSecret: "s" }, path: "/private-id" }).catch(
+			(value) => value,
+		);
+		expect(error.message).toContain("HTTP 404");
+		expect(error.message).not.toContain("private server detail");
+		expect(error.message).not.toContain("private-id");
 	});
 });

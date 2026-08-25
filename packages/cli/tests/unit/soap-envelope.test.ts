@@ -100,19 +100,21 @@ describe("postSoap empty-body guard", () => {
 		globalThis.fetch = (async () => new Response("", { status: 200 })) as typeof fetch;
 
 		await expect(
-			getStatus({ mode: "prod", wsUsername: "10712392563HUNTER17", wsPassword: "x", ticket: "1" }),
+			getStatus({ mode: "prod", wsUsername: "20000000001MODDATOS", wsPassword: "x", ticket: "1" }),
 		).rejects.toThrow(/empty body/i);
 	});
 
-	test("a text reason in <content> surfaces as an error, not as a zip failure", async () => {
+	test("a text reason in <content> is redacted from the error", async () => {
 		// Real beta response to getStatus with a ticket that does not exist.
 		const envelope =
 			'<S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/"><S:Body><ns2:getStatusResponse xmlns:ns2="http://service.sunat.gob.pe"><status><content>El ticket no existe</content><statusCode>0127</statusCode></status></ns2:getStatusResponse></S:Body></S:Envelope>';
 		globalThis.fetch = (async () => new Response(envelope, { status: 200 })) as typeof fetch;
 
-		await expect(getStatus({ mode: "beta", wsUsername: "u", wsPassword: "p", ticket: "1" })).rejects.toThrow(
-			/0127.*El ticket no existe/,
+		const error = await getStatus({ mode: "beta", wsUsername: "u", wsPassword: "p", ticket: "1" }).catch(
+			(value) => value,
 		);
+		expect(error.message).toContain("0127");
+		expect(error.message).not.toContain("El ticket no existe");
 	});
 
 	test("a non-empty response is still parsed normally", async () => {

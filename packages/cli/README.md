@@ -13,7 +13,7 @@ Agent-first CLI for SUNAT tax automation. Built for AI agents as primary consume
 ## Install
 
 ```bash
-bun add -g @crafter/sunat-cli
+npm install -g @crafter/sunat-cli
 ```
 
 ## Usage
@@ -28,7 +28,7 @@ sunat-cli schema rhe                     # Introspect fields
 sunat-cli rhe emit --dry-run --json '{}' # Preview
 sunat-cli rhe emit --batch ./data.csv    # Batch emit
 sunat-cli f616 declare --dry-run --json '{"periodo":"2025-03"}'
-sunat-cli api token --output json        # OAuth2 token
+sunat-cli api token --output json        # Validate OAuth2 credentials without printing the token
 ```
 
 ### SIRE — Registro de Ventas (RVIE) y Compras (RCE)
@@ -59,6 +59,8 @@ sunat-cli sire ventas importar --periodo 202404 --file extra.zip --tipo propuest
 sunat-cli sire compras periodos
 sunat-cli sire compras propuesta --periodo 202404 --wait --out compras-202404.zip
 ```
+
+For local use, prefer `sunat-cli keychain set <KEY>`. Secrets are accepted through hidden prompts or environment variables, never CLI value flags.
 
 ### Guía de Remisión Electrónica (GRE — REST OAuth)
 
@@ -163,6 +165,8 @@ in `~/.sunat/audit/YYYY-MM.jsonl` (two-phase: pending → success/error). Older
 months can be compacted into `~/.sunat/audit/archive/YYYY-MM.jsonl.gz` with
 `sunat-cli audit compact`, and archived months can be removed manually with
 `sunat-cli audit prune --before YYYY-MM`.
+
+Audit persistence is minimized: command arguments are not retained, taxpayer and document identifiers use keyed references, and legacy screenshots are deleted during migration.
 
 Full shaping rationale + recon dossier + SUNAT debugging notes:
 `src/commands/cpe/RESEARCH.md`.

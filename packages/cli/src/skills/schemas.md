@@ -33,11 +33,11 @@ gives S/124.
 
 Portal: Nueva Plataforma (e-menu.sunat.gob.pe/cl-ti-itmenu2/), menu code 55.1.3.1.5.
 
-## Hunter's Typical RHE Payload (Clerk)
+## Example RHE payload
 
 ```json
 {
-  "empresa": "Clerk Inc",
+  "empresa": "Cliente Ejemplo",
   "tipoDoc": "SIN DOCUMENTO",
   "descripcion": "Servicios de desarrollo de software - {MES} {AÑO}",
   "monto": 6700,
@@ -46,13 +46,13 @@ Portal: Nueva Plataforma (e-menu.sunat.gob.pe/cl-ti-itmenu2/), menu code 55.1.3.
 }
 ```
 
-## Hunter's Typical F616 Flow
+## Example F616 flow
 
 There is no payload: the amount comes from a row loaded into the form.
 
 ```bash
 sunat f616 declarar periodo 2026-03
-sunat f616 declarar ingreso --fecha 03/03/2026 --monto 21016 --cliente "CLERK INC"
+sunat f616 declarar ingreso --fecha 03/03/2026 --monto 21016 --cliente "CLIENTE EJEMPLO"
 sunat f616 declarar estado     # casilla 355 has the figure SUNAT will charge
 sunat f616 declarar bandeja
 ```
@@ -72,6 +72,6 @@ Income row fields (the modal's, not a CLI schema):
 
 ```csv
 empresa,tipoDoc,descripcion,monto,moneda,medioPago,fechaEmision
-"Clerk Inc","SIN DOCUMENTO","Desarrollo software - Enero 2026",6700,USD,TRANSFERENCIA,2026-01-31
-"Clerk Inc","SIN DOCUMENTO","Desarrollo software - Febrero 2026",6700,USD,TRANSFERENCIA,2026-02-28
+"Cliente Ejemplo","SIN DOCUMENTO","Desarrollo software - Enero 2026",6700,USD,TRANSFERENCIA,2026-01-31
+"Cliente Ejemplo","SIN DOCUMENTO","Desarrollo software - Febrero 2026",6700,USD,TRANSFERENCIA,2026-02-28
 ```
