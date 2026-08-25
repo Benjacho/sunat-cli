@@ -1,9 +1,10 @@
 import { Command } from "commander";
-import { existsSync, readFileSync, readdirSync } from "fs";
+import { existsSync, readdirSync, readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { emitNextSteps } from "../utils/next-steps.ts";
 import { output, outputError } from "../utils/output.ts";
+import { truncateVisible } from "../utils/style.ts";
 
 /**
  * Sirve la documentación del CLI desde el propio binario.
@@ -39,7 +40,7 @@ function quiereJson(): boolean {
 function resumen(md: string): string {
 	for (const line of md.split("\n")) {
 		const t = line.trim();
-		if (t && !t.startsWith("#")) return t.replace(/`/g, "").slice(0, 78);
+		if (t && !t.startsWith("#")) return truncateVisible(t.replace(/`/g, ""), 78);
 	}
 	return "";
 }
@@ -84,12 +85,17 @@ export function createSkillsCommand(): Command {
 		.action((name: string) => {
 			const file = join(SKILLS_DIR, `${name.replace(/[^a-z0-9-]/gi, "")}.md`);
 			if (!existsSync(file)) {
-				const disponibles = listar().map((s) => s.name).join(", ");
+				const disponibles = listar()
+					.map((s) => s.name)
+					.join(", ");
 				outputError(`No existe "${name}". Disponibles: ${disponibles || "(ninguno)"}`, quiereJson() ? "json" : "table");
 				return;
 			}
 			const content = readFileSync(file, "utf-8");
-			if (quiereJson()) { output("json", { json: { name, content } }); return; }
+			if (quiereJson()) {
+				output("json", { json: { name, content } });
+				return;
+			}
 			console.log(content);
 		});
 
