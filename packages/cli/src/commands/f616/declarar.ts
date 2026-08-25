@@ -1,16 +1,26 @@
 import { Command } from "commander";
 import { audit } from "../../data/audit.ts";
-import { output, outputError } from "../../utils/output.ts";
+import { type OutputFormat, output, outputError } from "../../utils/output.ts";
 import { descargarConstancias } from "../../workflows/f616-constancias.ts";
 import {
-	abrirPeriodo, agregarABandeja, agregarIngreso, conectarF616,
-	leerDeuda, limpiarIngresos, listarIngresos, periodoAbierto,
+	abrirPeriodo,
+	agregarABandeja,
+	agregarIngreso,
+	conectarF616,
 	type IngresoF616,
+	leerDeuda,
+	limpiarIngresos,
+	listarIngresos,
+	periodoAbierto,
 } from "../../workflows/f616-declare.ts";
 
-function getFormat(cmd: Command): string {
+function getFormat(cmd: Command): OutputFormat {
 	let p: Command | null = cmd;
-	while (p) { const o = p.opts(); if (o.output) return o.output as string; p = p.parent; }
+	while (p) {
+		const o = p.opts();
+		if (o.output) return o.output as OutputFormat;
+		p = p.parent;
+	}
 	return "auto";
 }
 
@@ -39,17 +49,21 @@ export function createDeclararCommand(): Command {
 			let s: Awaited<ReturnType<typeof conectarF616>> | undefined;
 			try {
 				s = await conectarF616();
-				output(format, { json: { periodo: await periodoAbierto(s), filas: await listarIngresos(s), ...(await leerDeuda(s)) } });
+				output(format, {
+					json: { periodo: await periodoAbierto(s), filas: await listarIngresos(s), ...(await leerDeuda(s)) },
+				});
 			} catch (e) {
 				outputError(e instanceof Error ? e.message : String(e), format);
-			} finally { s?.close(); }
+			} finally {
+				s?.close();
+			}
 		});
 
 	cmd
 		.command("periodo <YYYY-MM>")
 		.description("Abre un periodo. Recargá el formulario antes de cambiar de periodo.")
-		.option("--telefono <n>", "Teléfono para Información General", "963422021")
-		.option("--profesion <p>", "Profesión del catálogo", "INGENIERO")
+		.requiredOption("--telefono <n>", "Teléfono para Información General")
+		.requiredOption("--profesion <p>", "Profesión del catálogo")
 		.action(async (periodo, opts, c) => {
 			const format = getFormat(c);
 			let s: Awaited<ReturnType<typeof conectarF616>> | undefined;
@@ -58,13 +72,16 @@ export function createDeclararCommand(): Command {
 				const ok = await abrirPeriodo(s, aMMAAAA(periodo), opts.telefono, opts.profesion);
 				output(format, {
 					json: {
-						periodo: await periodoAbierto(s), habilitado: ok,
+						periodo: await periodoAbierto(s),
+						habilitado: ok,
 						...(ok ? {} : { aviso: "El formulario no se habilitó. Revisá si SUNAT mostró algún aviso." }),
 					},
 				});
 			} catch (e) {
 				outputError(e instanceof Error ? e.message : String(e), format);
-			} finally { s?.close(); }
+			} finally {
+				s?.close();
+			}
 		});
 
 	cmd
@@ -80,10 +97,18 @@ export function createDeclararCommand(): Command {
 			const format = getFormat(c);
 			const partes = String(opts.cliente).trim().split(/\s+/);
 			const ing: IngresoF616 = {
-				fecha: opts.fecha, monto: Number(opts.monto), serie: opts.serie, numero: opts.numero,
-				apePat: partes[0] || opts.cliente, apeMat: partes[1] || "", nombres: opts.cliente,
+				fecha: opts.fecha,
+				monto: Number(opts.monto),
+				serie: opts.serie,
+				numero: opts.numero,
+				apePat: partes[0] || opts.cliente,
+				apeMat: partes[1] || "",
+				nombres: opts.cliente,
 			};
-			if (opts.dryRun) { output(format, { json: { dryRun: true, ...ing, status: "would-add" } }); return; }
+			if (opts.dryRun) {
+				output(format, { json: { dryRun: true, ...ing, status: "would-add" } });
+				return;
+			}
 
 			let s: Awaited<ReturnType<typeof conectarF616>> | undefined;
 			try {
@@ -91,16 +116,24 @@ export function createDeclararCommand(): Command {
 				const abierto = await periodoAbierto(s);
 				const mesFecha = String(opts.fecha).slice(3);
 				if (abierto && abierto !== mesFecha) {
-					outputError(`El formulario tiene ${abierto} y la fecha es de ${mesFecha}. SUNAT exige que coincidan.`, format);
+					outputError(
+						`El formulario tiene ${abierto} y la fecha es de ${mesFecha}. SUNAT exige que coincidan.`,
+						format,
+					);
 					return;
 				}
 				const r = await agregarIngreso(s, ing);
 				audit({ command: "f616 declarar ingreso", args: { ...ing }, result: r.ok ? "success" : "error", details: r });
-				if (!r.ok) { outputError(r.error || "SUNAT rechazó la fila.", format); return; }
+				if (!r.ok) {
+					outputError(r.error || "SUNAT rechazó la fila.", format);
+					return;
+				}
 				output(format, { json: { success: true, filas: r.filas, ...(await leerDeuda(s)) } });
 			} catch (e) {
 				outputError(e instanceof Error ? e.message : String(e), format);
-			} finally { s?.close(); }
+			} finally {
+				s?.close();
+			}
 		});
 
 	cmd
@@ -113,11 +146,18 @@ export function createDeclararCommand(): Command {
 				s = await conectarF616();
 				const r = await agregarABandeja(s);
 				audit({ command: "f616 declarar bandeja", args: {}, result: r.ok ? "success" : "error", details: r });
-				if (!r.ok) { outputError(r.mensaje || "No se pudo agregar a la bandeja.", format); return; }
-				output(format, { json: { success: true, importe: r.importe, nota: "Presentá y pagá vos desde Presente/Pague." } });
+				if (!r.ok) {
+					outputError(r.mensaje || "No se pudo agregar a la bandeja.", format);
+					return;
+				}
+				output(format, {
+					json: { success: true, importe: r.importe, nota: "Presentá y pagá vos desde Presente/Pague." },
+				});
 			} catch (e) {
 				outputError(e instanceof Error ? e.message : String(e), format);
-			} finally { s?.close(); }
+			} finally {
+				s?.close();
+			}
 		});
 
 	cmd
@@ -131,7 +171,9 @@ export function createDeclararCommand(): Command {
 				output(format, { json: { filasRestantes: await limpiarIngresos(s) } });
 			} catch (e) {
 				outputError(e instanceof Error ? e.message : String(e), format);
-			} finally { s?.close(); }
+			} finally {
+				s?.close();
+			}
 		});
 
 	cmd
@@ -142,7 +184,10 @@ export function createDeclararCommand(): Command {
 			const format = getFormat(c);
 			try {
 				const r = await descargarConstancias(opts.dir);
-				if (!r.ok) { outputError(r.mensaje || "No se pudo descargar.", format); return; }
+				if (!r.ok) {
+					outputError(r.mensaje || "No se pudo descargar.", format);
+					return;
+				}
 				output(format, { json: { success: true, dir: r.dir, nota: r.mensaje } });
 			} catch (e) {
 				outputError(e instanceof Error ? e.message : String(e), format);

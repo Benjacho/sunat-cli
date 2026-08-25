@@ -275,7 +275,7 @@ export function createCpeCommand(): Command {
 						fechaEmision: input.fechaEmision,
 						file: queued.file,
 						totalQueuedToday: queued.total,
-						hint: "When done emitting boletas for the day, run: sunat cpe resumen send --fecha " + input.fechaEmision,
+						hint: `When done emitting boletas for the day, run: sunat cpe resumen send --fecha ${input.fechaEmision}`,
 					},
 				});
 			} catch (err) {
@@ -287,12 +287,15 @@ export function createCpeCommand(): Command {
 		.command("queue:list")
 		.description("List queued boletas pending daily-summary. T0.")
 		.option("--fecha <YYYY-MM-DD>", "Filter to a specific fechaEmision")
+		.option("--show-details", "Include full local tax records. Handle output as sensitive data.")
 		.action((opts, cmd) => {
 			const format = getFormat(cmd);
 			try {
 				if (opts.fecha) {
 					const entries = readQueue(opts.fecha);
-					output(format, { json: { fecha: opts.fecha, total: entries.length, entries } });
+					output(format, {
+						json: { fecha: opts.fecha, total: entries.length, ...(opts.showDetails ? { entries } : {}) },
+					});
 					return;
 				}
 				const dates = listQueueDates();
@@ -409,12 +412,6 @@ export function createCpeCommand(): Command {
 				const { signFacturaXml } = await import("../../cpe/sign/xades.ts");
 				const { buildGreUbl, greFilename } = await import("../../cpe/ubl/gre.ts");
 				const { greCredentials, enviarGre, pollGreTicket } = await import("../../sunat-rest/gre.ts");
-				const { resolveOAuthCredentials } = await import("../../cpe/oauth-config.ts").catch(() => ({
-					resolveOAuthCredentials: () => {
-						throw new Error("oauth-config not found");
-					},
-				}));
-
 				const ctx = resolveCpeContext();
 				const input = JSON.parse(opts.params);
 				if (!input.envio || !input.destinatario || !input.items?.length) {
@@ -600,10 +597,9 @@ export function createCpeCommand(): Command {
 						tipoDoc: "03" as const,
 						serie: q.input.serie,
 						numero: q.input.numero,
-						receptor:
-							q.input.receptor && q.input.receptor.numDoc
-								? { tipoDoc: q.input.receptor.tipoDoc, numDoc: q.input.receptor.numDoc }
-								: undefined,
+						receptor: q.input.receptor?.numDoc
+							? { tipoDoc: q.input.receptor.tipoDoc, numDoc: q.input.receptor.numDoc }
+							: undefined,
 						totales: q.input.totales,
 						moneda: q.input.moneda,
 					})),

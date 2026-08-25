@@ -1,6 +1,6 @@
 import * as browser from "../browser/client.ts";
-import type { TipoDocumento, MedioPago } from "../validation/input.ts";
 import { today } from "../utils/dates.ts";
+import type { MedioPago, TipoDocumento } from "../validation/input.ts";
 
 export interface RHEInput {
 	empresa: string;
@@ -18,7 +18,6 @@ export interface RHEResult {
 	retencion8Pct: number;
 	netoRecibido: number;
 	fechaEmision: string;
-	screenshot?: string;
 }
 
 const MEDIO_PAGO_SUNAT: Record<string, string> = {
@@ -32,7 +31,7 @@ const MEDIO_PAGO_SUNAT: Record<string, string> = {
 	EFECTIVO: "Efectivo - por operaciones donde no existe obligación de utilizar Medios de Pago",
 };
 
-export async function emitRHE(input: RHEInput, screenshotPath?: string): Promise<RHEResult> {
+export async function emitRHE(input: RHEInput): Promise<RHEResult> {
 	// Navigate to RHE form
 	await browser.evalJS(
 		"ejecuta('MenuInternet.htm?action=iconExecute&code=11.5.1.1.2',false,'Emisión de Recibo por Honorarios Electrónico','#nivel1_11','11.5.1.1.2')",
@@ -90,10 +89,6 @@ export async function emitRHE(input: RHEInput, screenshotPath?: string): Promise
 	const montoRef = findRefByValue(snap, "0.0", "textbox");
 	await browser.fill(montoRef, String(input.monto));
 
-	if (screenshotPath) {
-		await browser.screenshot(screenshotPath);
-	}
-
 	// Click Continuar → preview
 	const btn3 = findRef(snap, "Continuar", "button");
 	await browser.click(btn3);
@@ -101,12 +96,11 @@ export async function emitRHE(input: RHEInput, screenshotPath?: string): Promise
 
 	// === STEP 4: Preview & submit ===
 	snap = await browser.snapshot({ interactive: true });
-	if (screenshotPath) {
-		await browser.screenshot(screenshotPath.replace(".png", "-preview.png"));
-	}
-
 	// Look for Emitir, Aceptar, or Continuar button
-	const submitBtn = findRefSafe(snap, "Emitir", "button") || findRefSafe(snap, "Aceptar", "button") || findRef(snap, "Continuar", "button");
+	const submitBtn =
+		findRefSafe(snap, "Emitir", "button") ||
+		findRefSafe(snap, "Aceptar", "button") ||
+		findRef(snap, "Continuar", "button");
 	await browser.click(submitBtn);
 	await browser.sleep(4000);
 
@@ -121,14 +115,11 @@ export async function emitRHE(input: RHEInput, screenshotPath?: string): Promise
 		}
 	} catch {}
 
-	// Screenshot final result
-	if (screenshotPath) {
-		await browser.screenshot(screenshotPath.replace(".png", "-result.png"));
-	}
-
 	// Clean up and return to dashboard
 	await browser.clearBeforeUnload();
-	await browser.open("https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?pestana=*&agrupacion=*", { headed: true });
+	await browser.open("https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?pestana=*&agrupacion=*", {
+		headed: true,
+	});
 	await browser.sleep(2000);
 
 	return {
@@ -137,7 +128,6 @@ export async function emitRHE(input: RHEInput, screenshotPath?: string): Promise
 		retencion8Pct: Math.round(input.monto * 0.08 * 100) / 100,
 		netoRecibido: Math.round(input.monto * 0.92 * 100) / 100,
 		fechaEmision: input.fechaEmision || today(),
-		screenshot: screenshotPath,
 	};
 }
 

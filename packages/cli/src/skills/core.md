@@ -2,7 +2,7 @@
 
 SUNAT tax automation via `npx @crafter/sunat-cli` (or `sunat` if globally installed).
 
-Install: `bun add -g @crafter/sunat-cli`
+Install: `npm install -g @crafter/sunat-cli`
 
 Current beta posture: supervised RHE/F616 beta, not autonomous filing. Real SUNAT operations require `--yes --live-sunat`, should use `--preview-only` first, and must stop if preview values cannot be parsed or reconciled.
 
@@ -10,24 +10,25 @@ Current beta posture: supervised RHE/F616 beta, not autonomous filing. Real SUNA
 
 Three ways to provide credentials (priority order):
 
-1. **Inline flags** (agent-friendly): `sunat-cli login --ruc 10XXXXXXXXX --user XXXXXXXX --password XXXXXX`
+1. **Non-secret flags**: `sunat-cli login --ruc 10XXXXXXXXX --user XXXXXXXX`
 2. **Env vars**: `SUNAT_RUC`, `SUNAT_USER`, `SUNAT_PASSWORD`
 3. **Interactive prompts**: just run `sunat-cli login` and it asks step by step
 
 ```bash
-sunat-cli login --ruc 10123456789 --user MYUSER --password MYPASS
-sunat-cli login --nueva-plataforma --ruc 10123456789 --user MYUSER --password MYPASS
+sunat-cli keychain set SUNAT_PASSWORD
+sunat-cli login --ruc 10XXXXXXXXX --user MYUSER
+sunat-cli login --nueva-plataforma --ruc 10XXXXXXXXX --user MYUSER
 sunat-cli whoami
 ```
 
-RUC and usuario are saved to `~/.sunat/config.json` after first login. Password is never stored.
+RUC and usuario are saved to `~/.sunat/config.json` after first login. Password is never stored in config or another plaintext file; optional persistence uses the OS keychain.
 
 ### RHE (Recibo por Honorarios)
 
 ```bash
 # Emit single RHE
 sunat rhe emit --json '{
-  "empresa": "Clerk Inc",
+  "empresa": "Cliente Ejemplo",
   "tipoDoc": "SIN DOCUMENTO",
   "descripcion": "Servicios de desarrollo de software",
   "monto": 6700,
@@ -81,7 +82,7 @@ is cached.
 ```bash
 sunat f616 declarar estado
 sunat f616 declarar periodo 2025-11
-sunat f616 declarar ingreso --fecha 17/11/2025 --monto 21054 --cliente "CLERK INC"
+sunat f616 declarar ingreso --fecha 17/11/2025 --monto 21054 --cliente "CLIENTE EJEMPLO"
 sunat f616 declarar bandeja
 sunat f616 declarar constancias --dir ~/Downloads/constancias
 ```
@@ -114,7 +115,7 @@ then ignored by the code. Prefer `declarar`.
 ### API & Schema
 
 ```bash
-sunat api token              # Get/refresh OAuth2 token
+sunat api token              # Validate OAuth2 credentials without printing the token
 sunat schema rhe             # JSON schema for RHE fields
 sunat schema f616            # JSON schema for F616 fields
 ```
@@ -142,9 +143,9 @@ All commands support `--output <format>`:
 form between periods**. Eight periods spanning nine months were filed this way on
 2026-08-22 without emitting a single RHE.
 
-**Emit RHE for Clerk**:
+**Emit an RHE**:
 1. `sunat login`
-2. `sunat rhe emit --json '{"empresa":"Clerk Inc","tipoDoc":"SIN DOCUMENTO","descripcion":"Servicios de desarrollo de software - Marzo 2026","monto":6700,"moneda":"USD","medioPago":"TRANSFERENCIA","tipoCambio":3.75}' --dry-run`
+2. `sunat rhe emit --json '{"empresa":"Cliente Ejemplo","tipoDoc":"SIN DOCUMENTO","descripcion":"Servicios de desarrollo de software - Marzo 2026","monto":6700,"moneda":"USD","medioPago":"TRANSFERENCIA","tipoCambio":3.75}' --dry-run`
 3. `sunat rhe verify --month 2026-03`
 
 ## Error Handling

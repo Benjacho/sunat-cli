@@ -66,8 +66,7 @@ export async function tusCreate(opts: TusCreateOpts): Promise<TusCreateResult> {
 	});
 
 	if (resp.status !== 201) {
-		const text = await resp.text();
-		throw new Error(`TUS create failed: HTTP ${resp.status}: ${text.slice(0, 500)}`);
+		throw new Error(`TUS create failed: HTTP ${resp.status}`);
 	}
 
 	const location = resp.headers.get("Location") || resp.headers.get("location");
@@ -131,8 +130,7 @@ export async function tusPatch(opts: TusPatchOpts): Promise<TusPatchResult> {
 		body,
 	});
 	if (resp.status !== 204) {
-		const text = await resp.text();
-		throw new Error(`TUS patch failed at offset ${opts.offset}: HTTP ${resp.status}: ${text.slice(0, 500)}`);
+		throw new Error(`TUS patch failed at offset ${opts.offset}: HTTP ${resp.status}`);
 	}
 	const newOffsetHeader = resp.headers.get("Upload-Offset");
 	if (!newOffsetHeader) throw new Error("TUS patch response missing Upload-Offset");

@@ -5,9 +5,14 @@
  * Tests clean up after themselves.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
-import { join } from "path";
-import { findCachedResult, findStalePendings, idempotencyKey } from "../../src/cpe/idempotency.ts";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+	findCachedResult,
+	findStalePendings,
+	idempotencyKey,
+	idempotencyReference,
+} from "../../src/cpe/idempotency.ts";
 import { paths } from "../../src/data/config.ts";
 
 const TEST_RUC = "29999999999";
@@ -66,7 +71,7 @@ describe("findCachedResult", () => {
 			args: {},
 			result: "success",
 			details: {
-				id: idempotencyKey(KEY),
+				idRef: idempotencyReference(KEY),
 				hash: "sha256:abc",
 				status: "accepted",
 				cdrCode: "0",
@@ -89,14 +94,14 @@ describe("findCachedResult", () => {
 			command: "cpe factura emit",
 			args: {},
 			result: "pending",
-			details: { id: idempotencyKey(KEY) },
+			details: { idRef: idempotencyReference(KEY) },
 		});
 		appendTestEntry({
 			timestamp: "2026-04-29T00:01:00Z",
 			command: "cpe factura emit",
 			args: {},
 			result: "error",
-			details: { id: idempotencyKey(KEY), error: "x" },
+			details: { idRef: idempotencyReference(KEY) },
 		});
 		expect(findCachedResult(KEY)).toBeNull();
 	});
@@ -109,7 +114,7 @@ describe("findCachedResult", () => {
 			command: "cpe factura emit",
 			args: {},
 			result: "success",
-			details: { id: idempotencyKey(KEY), cdrCode: "0", status: "accepted" },
+			details: { idRef: idempotencyReference(KEY), cdrCode: "0", status: "accepted" },
 		});
 		expect(findCachedResult(KEY)?.cdrCode).toBe("0");
 	});

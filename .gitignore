@@ -105,6 +105,22 @@ web_modules/
 .env.test.local
 .env.production.local
 .env.local
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.har
+*.zip
+*.pdf
+*.jsonl
+*.jsonl.gz
+*.private.json
+*.private.xml
+*.private.txt
 
 # Private data (real tax data, credentials)
 **/regularizacion.csv

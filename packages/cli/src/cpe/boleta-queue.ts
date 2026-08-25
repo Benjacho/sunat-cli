@@ -9,9 +9,10 @@
  * carries emisorRuc), so a single config can manage several RUCs in parallel.
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "fs";
-import { join } from "path";
+import { existsSync, readdirSync, readFileSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
 import { paths } from "../data/config.ts";
+import { appendPrivateFile, ensurePrivateDir, secureExistingFile, writePrivateFile } from "../data/private-storage.ts";
 import type { BoletaInput } from "./drivers/types.ts";
 
 export interface QueuedBoleta {
@@ -23,7 +24,7 @@ export interface QueuedBoleta {
 const QUEUE_DIR = join(paths.sunatDir, "boletas-pending");
 
 function ensureDir(): void {
-	if (!existsSync(QUEUE_DIR)) mkdirSync(QUEUE_DIR, { recursive: true });
+	ensurePrivateDir(QUEUE_DIR);
 }
 
 export function queuePath(fechaEmision: string): string {
@@ -38,7 +39,7 @@ export function enqueueBoleta(emisorRuc: string, input: BoletaInput): { file: st
 		emisorRuc,
 		input,
 	};
-	appendFileSync(file, `${JSON.stringify(entry)}\n`);
+	appendPrivateFile(file, `${JSON.stringify(entry)}\n`);
 	const total = readQueue(input.fechaEmision).filter((q) => q.emisorRuc === emisorRuc).length;
 	return { file, total };
 }
@@ -46,6 +47,7 @@ export function enqueueBoleta(emisorRuc: string, input: BoletaInput): { file: st
 export function readQueue(fechaEmision: string): QueuedBoleta[] {
 	const file = queuePath(fechaEmision);
 	if (!existsSync(file)) return [];
+	secureExistingFile(file);
 	return readFileSync(file, "utf-8")
 		.split("\n")
 		.filter((line) => line.trim().length > 0)
@@ -74,5 +76,5 @@ export function clearQueueForEmisor(fechaEmision: string, emisorRuc: string): vo
 		return;
 	}
 	const text = remaining.map((q) => JSON.stringify(q)).join("\n");
-	writeFileSync(file, `${text}\n`);
+	writePrivateFile(file, `${text}\n`);
 }

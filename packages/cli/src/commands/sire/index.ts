@@ -1,8 +1,9 @@
+import { statSync as fileStat, readFileSync as readFile } from "node:fs";
+import { basename } from "node:path";
 import { Command } from "commander";
-import { statSync as fileStat, readFileSync as readFile, writeFileSync } from "fs";
-import { basename } from "path";
 import { audit } from "../../data/audit.ts";
 import { getApiCredentials, getCredentials } from "../../data/config.ts";
+import { writePrivateOutputFile } from "../../data/private-storage.ts";
 import {
 	aceptarPropuestaRvie,
 	COD_LIBRO,
@@ -32,9 +33,8 @@ function getFormat(cmd: Command): Format {
 }
 
 function resolveSireCreds(): ReturnType<typeof sireCredentials> {
-	// clientId + secret resolve from env, then ~/.sunat/config.json, then keychain
-	// (getApiCredentials). RUC + SOL user + password come from the same place login
-	// stored them, so a logged-in user does not have to re-set env vars for SIRE.
+	// Public identifiers resolve from env or config. Secrets resolve from env or
+	// the OS keychain and are never stored in config.
 	const { clientId, clientSecret } = getApiCredentials();
 	const { ruc, usuario: solUsuario, password: solPassword } = getCredentials();
 	return sireCredentials({ clientId, clientSecret, ruc, solUsuario, solPassword });
@@ -111,7 +111,7 @@ function bookCommand(libroAlias: "ventas" | "compras", codLibro: CodLibro): Comm
 						},
 						creds,
 					);
-					writeFileSync(opts.out, buf);
+					writePrivateOutputFile(opts.out, buf);
 					output(format, {
 						json: {
 							numTicket,
@@ -183,7 +183,7 @@ function bookCommand(libroAlias: "ventas" | "compras", codLibro: CodLibro): Comm
 					},
 					creds,
 				);
-				writeFileSync(opts.out, buf);
+				writePrivateOutputFile(opts.out, buf);
 				output(format, { json: { file: opts.out, bytes: buf.length } });
 			} catch (err) {
 				outputError(err instanceof Error ? err.message : String(err), format);
@@ -393,7 +393,7 @@ function bookCommand(libroAlias: "ventas" | "compras", codLibro: CodLibro): Comm
 							},
 							creds,
 						);
-						writeFileSync(opts.out, buf);
+						writePrivateOutputFile(opts.out, buf);
 						output(format, { json: { numTicket, ...result, file: opts.out, bytes: buf.length } });
 						return;
 					}

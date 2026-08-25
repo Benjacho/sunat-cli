@@ -5,8 +5,20 @@ const sunatTheme = {
 	name: "sunat",
 	type: "dark" as const,
 	settings: [
-		{ scope: ["comment", "comment.line", "comment.line.number-sign", "comment.line.number-sign.shell", "punctuation.definition.comment"], settings: { foreground: "#64748B", fontStyle: "italic" } },
-		{ scope: ["string", "string.quoted", "string.quoted.double", "string.quoted.single"], settings: { foreground: "#FCA5A5" } },
+		{
+			scope: [
+				"comment",
+				"comment.line",
+				"comment.line.number-sign",
+				"comment.line.number-sign.shell",
+				"punctuation.definition.comment",
+			],
+			settings: { foreground: "#64748B", fontStyle: "italic" },
+		},
+		{
+			scope: ["string", "string.quoted", "string.quoted.double", "string.quoted.single"],
+			settings: { foreground: "#FCA5A5" },
+		},
 		{ scope: ["constant", "constant.numeric", "constant.language"], settings: { foreground: "#C41E3A" } },
 		{ scope: ["keyword", "keyword.operator", "keyword.control"], settings: { foreground: "#93C5FD" } },
 		{ scope: ["entity.name.function", "support.function"], settings: { foreground: "#FFFFFF" } },
@@ -44,7 +56,7 @@ const features = [
 	{
 		title: "RHE + F616 (personas naturales)",
 		desc: "Browser login without CAPTCHA. RHE in batch, F616 mensual read headless from the declaration API.",
-		code: "$ sunat-cli f616 declare --json '{\"periodo\":\"2026-03\"}'",
+		code: '$ sunat-cli f616 declare --json \'{"periodo":"2026-03"}\'',
 	},
 	{
 		title: "OS Keychain Secrets",
@@ -85,18 +97,14 @@ const coverage = [
 	{ domain: "Producción end-to-end (live)", pct: 10, color: "red", status: "untested" },
 ];
 
-const overallAgentReady = Math.round(
-	coverage.reduce((sum, c) => sum + c.pct, 0) / coverage.length,
-);
+const overallAgentReady = Math.round(coverage.reduce((sum, c) => sum + c.pct, 0) / coverage.length);
 
 const roadmap = [
 	{
 		when: "Now",
 		label: "P0",
 		color: "var(--red)",
-		items: [
-			{ n: 10, t: "cpe void T3 — intent-token flow + safety rail", area: "cpe" },
-		],
+		items: [{ n: 10, t: "cpe void T3: intent-token flow + safety rail", area: "cpe" }],
 	},
 	{
 		when: "Next",
@@ -126,19 +134,15 @@ const roadmap = [
 		color: "#0E8A16",
 		items: [
 			{ n: 19, t: "Catálogos SUNAT cacheados (Cat 02, 03, 06, 51)", area: "cpe" },
-			{ n: 20, t: "Audit log rotation", area: "infra" },
-			{ n: 21, t: "Keychain integration (macOS, Linux secret-service)", area: "infra" },
 			{ n: 22, t: "Multi-RUC profile testing + multi-emisor support", area: "cpe" },
 		],
 	},
 ];
 
-const featureHtmls = await Promise.all(
-	features.map(f => codeToHtml(f.code, { lang: "bash", theme: sunatTheme }))
-);
+const featureHtmls = await Promise.all(features.map((f) => codeToHtml(f.code, { lang: "bash", theme: sunatTheme })));
 
 const heroCode = `# Install globally
-$ bun add -g @crafter/sunat-cli
+$ npm install -g @crafter/sunat-cli
 
 # Introspect schema (agents self-serve)
 $ sunat-cli schema cpe-factura --output json
@@ -491,7 +495,7 @@ const stats = [
 							<a href="https://github.com/crafter-research/sunat-cli" class="btn btn-primary">Get started</a>
 							<a href="#features" class="btn btn-outline">Learn more</a>
 						</div>
-						<p class="install-cmd mono">$ <code>bun add -g @crafter/sunat-cli</code></p>
+						<p class="install-cmd mono">$ <code>npm install -g @crafter/sunat-cli</code></p>
 					</div>
 					<div class="hero-code" set:html={heroCodeHtml} />
 				</div>
@@ -653,9 +657,5 @@ const stats = [
 			</div>
 		</footer>
 
-		<script>
-			import { inject } from "@vercel/analytics";
-			inject();
-		</script>
 	</body>
 </html>

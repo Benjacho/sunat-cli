@@ -7,10 +7,11 @@
  * 3. ~/.sunat/config.json (shared with RHE/F616, RUC + usuario only)
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { join } from "path";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { paths } from "../data/config.ts";
 import { missingSecretMessage, resolveSecret } from "../data/keychain.ts";
+import { ensurePrivateDir, secureExistingFile, writePrivateFile } from "../data/private-storage.ts";
 
 export interface CpeEmisor {
 	ruc: string;
@@ -38,12 +39,13 @@ const CPE_CONFIG_FILE = join(paths.sunatDir, "cpe.json");
 
 export function loadCpeConfig(): CpeConfig {
 	if (!existsSync(CPE_CONFIG_FILE)) return { profiles: {} };
+	secureExistingFile(CPE_CONFIG_FILE);
 	return JSON.parse(readFileSync(CPE_CONFIG_FILE, "utf-8")) as CpeConfig;
 }
 
 export function saveCpeConfig(config: CpeConfig): void {
-	if (!existsSync(paths.sunatDir)) mkdirSync(paths.sunatDir, { recursive: true });
-	writeFileSync(CPE_CONFIG_FILE, JSON.stringify(config, null, 2));
+	ensurePrivateDir(paths.sunatDir);
+	writePrivateFile(CPE_CONFIG_FILE, JSON.stringify(config, null, 2));
 }
 
 export interface CpeAuditContext {

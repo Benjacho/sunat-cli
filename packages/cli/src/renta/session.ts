@@ -1,7 +1,9 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { privateChildEnv } from "../data/child-process.ts";
+import { secureExistingFile, writePrivateFile } from "../data/private-storage.ts";
 
 /**
  * e-renta (e-renta.sunat.gob.pe) session token.
@@ -81,19 +83,17 @@ function decodeExp(jwt: string): number {
 /** Run one agent-browser subcommand against the renta session. */
 async function browser(args: string[], timeout = 20000): Promise<string> {
 	return new Promise<string>((resolve, reject) => {
-		const proc = spawn("agent-browser", ["--session", SESSION, ...args], { timeout });
+		const proc = spawn("agent-browser", ["--session", SESSION, ...args], {
+			env: privateChildEnv(process.env, [], ["AGENT_BROWSER_"]),
+			timeout,
+		});
 		let out = "";
-		let err = "";
 		proc.stdout.on("data", (d: Buffer) => {
 			out += d.toString();
 		});
-		proc.stderr.on("data", (d: Buffer) => {
-			err += d.toString();
-		});
+		proc.stderr.resume();
 		proc.on("error", () => reject(new Error("agent-browser not found. Install it: npm i -g agent-browser")));
-		proc.on("close", (code) =>
-			code === 0 ? resolve(out) : reject(new Error(`agent-browser ${args[0]} failed: ${stripAnsi(err) || code}`)),
-		);
+		proc.on("close", (code) => (code === 0 ? resolve(out) : reject(new Error(`agent-browser ${args[0]} failed`))));
 	});
 }
 
@@ -131,19 +131,19 @@ export async function captureTokenFromSession(): Promise<{ token: string; versio
 }
 
 export function storeToken(token: string, versionWeb: string): void {
-	if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true, mode: 0o700 });
 	const payload: CachedToken = {
 		token,
 		expiresAt: decodeExp(token),
 		capturedAt: Math.floor(Date.now() / 1000),
 		versionWeb,
 	};
-	writeFileSync(CACHE_FILE, JSON.stringify(payload, null, 2), { mode: 0o600 });
+	writePrivateFile(CACHE_FILE, JSON.stringify(payload, null, 2));
 }
 
 export function readToken(): CachedToken | null {
 	if (!existsSync(CACHE_FILE)) return null;
 	try {
+		secureExistingFile(CACHE_FILE);
 		return JSON.parse(readFileSync(CACHE_FILE, "utf8")) as CachedToken;
 	} catch {
 		return null;

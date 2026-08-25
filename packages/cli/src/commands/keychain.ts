@@ -1,6 +1,6 @@
 import * as p from "@clack/prompts";
 import { Command } from "commander";
-import { clearKeychainSecret, getKeychainSecret, listKeychainSecrets, setKeychainSecret } from "../data/keychain.ts";
+import { clearKeychainSecret, listKeychainSecrets, setKeychainSecret } from "../data/keychain.ts";
 import { output, outputError } from "../utils/output.ts";
 
 type Format = "json" | "table" | "auto";
@@ -22,50 +22,24 @@ export function createKeychainCommand(): Command {
 		.command("set")
 		.description("Store a secret in the OS keychain.")
 		.argument("<key>", "Secret env var name, e.g. CPE_CERT_PASSWORD")
-		.option("--value <secret>", "Secret value. Omit it on a TTY to be prompted without echo.")
-		.action(async (key, opts, cmd) => {
+		.action(async (key, _opts, cmd) => {
 			const format = getFormat(cmd);
 			try {
-				let value = opts.value;
-				if (!value) {
-					if (!process.stdin.isTTY) {
-						outputError(`Pass --value, or run this on a terminal to be prompted for ${key}.`, format);
-						return;
-					}
-					const entered = await p.password({ message: `Value for ${key}` });
-					if (p.isCancel(entered)) {
-						p.cancel("Cancelled");
-						process.exit(0);
-					}
-					value = entered as string;
+				if (!process.stdin.isTTY) {
+					outputError(`Run this command on a terminal to be prompted for ${key} without echo.`, format);
+					return;
 				}
+				const entered = await p.password({ message: `Value for ${key}` });
+				if (p.isCancel(entered)) {
+					p.cancel("Cancelled");
+					process.exit(0);
+				}
+				const value = entered as string;
 				setKeychainSecret(key, value);
 				output(format, {
 					json: { success: true, key },
 					table: { headers: ["Key", "Status"], rows: [[key, "stored"]] },
 				});
-			} catch (err) {
-				outputError(err instanceof Error ? err.message : String(err), format);
-			}
-		});
-
-	keychain
-		.command("get")
-		.description("Read a secret from the OS keychain.")
-		.argument("<key>", "Secret env var name, e.g. CPE_CERT_PASSWORD")
-		.action((key, _opts, cmd) => {
-			const format = getFormat(cmd);
-			try {
-				const value = getKeychainSecret(key);
-				if (!value) {
-					outputError(`${key} not found in keychain.`, format);
-					return;
-				}
-				if (format === "json") {
-					output(format, { json: { key, value } });
-				} else {
-					console.log(value);
-				}
 			} catch (err) {
 				outputError(err instanceof Error ? err.message : String(err), format);
 			}

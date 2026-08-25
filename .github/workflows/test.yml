@@ -5,22 +5,61 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          bun-version: latest
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.15.0
+          registry-url: https://registry.npmjs.org
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.3.11
+      - name: Pin npm client
+        run: npm install --global npm@11.6.4 --registry https://registry.npmjs.org
       - name: Install dependencies
-        run: bun install
+        run: npm ci --ignore-scripts --registry https://registry.npmjs.org
+      - name: Install gitleaks
+        run: |
+          curl --fail --location --silent --show-error \
+            --output /tmp/gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz
+          echo "a65b5253807a68ac0cafa4414031fd740aeb55f54fb7e55f386acb52e6a840eb  /tmp/gitleaks.tar.gz" | sha256sum --check
+          tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
+      - name: Secret scan
+        run: gitleaks git --redact --no-banner --exit-code 1
+      - name: Dependency audit
+        run: |
+          npm audit --audit-level=high
+          npm audit signatures
+      - name: Privacy regression tests
+        run: bun test tests/unit/privacy.test.ts tests/unit/browser-client-privacy.test.ts tests/unit/child-process-privacy.test.ts tests/unit/keychain-privacy.test.ts
+        working-directory: packages/cli
       - name: Unit tests
         run: bun test tests/unit
         working-directory: packages/cli
       - name: E2E tests
         run: bun test tests/e2e
         working-directory: packages/cli
-      - name: Smoke (cpe doctor)
+      - name: Smoke
         run: bun run bin/sunat.ts -o json cpe doctor
+        working-directory: packages/cli
+      - name: Build website
+        run: npm run build
+        working-directory: packages/website
+      - name: Verify package contents
+        run: |
+          pack_dir=$(mktemp -d)
+          npm pack --pack-destination "$pack_dir" --ignore-scripts >/tmp/sunat-pack.txt
+          pack_file=$(find "$pack_dir" -maxdepth 1 -type f -name '*.tgz' -print -quit)
+          test -n "$pack_file"
+          tar -tzf "$pack_file" >/tmp/sunat-pack-files.txt
+          ! grep -E '(^|/)(tests|scripts)/|RESEARCH\.md|CONTEXT\.md|biome\.json|tsconfig\.json' /tmp/sunat-pack-files.txt
         working-directory: packages/cli

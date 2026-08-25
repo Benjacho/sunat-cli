@@ -9,7 +9,7 @@ export function createApiCommand(): Command {
 
 	api
 		.command("token")
-		.description("Get or refresh OAuth2 API token")
+		.description("Validate OAuth2 API credentials without printing the token")
 		.action(async (_, cmd) => {
 			const format = cmd.parent?.parent?.opts().output || "auto";
 			try {
@@ -30,17 +30,12 @@ export function createApiCommand(): Command {
 				});
 
 				if (!response.ok) {
-					throw new Error(`Token request failed: ${response.status} ${await response.text()}`);
+					throw new Error(`Token request failed with HTTP ${response.status}`);
 				}
 
 				const data = await response.json();
-				output(format, {
-					json: {
-						accessToken: data.access_token,
-						tokenType: data.token_type,
-						expiresIn: data.expires_in,
-					},
-				});
+				if (!data.access_token) throw new Error("Token response did not contain an access token.");
+				output(format, { json: { authenticated: true, tokenType: data.token_type, expiresIn: data.expires_in } });
 			} catch (err) {
 				outputError(err instanceof Error ? err.message : String(err), format);
 			}

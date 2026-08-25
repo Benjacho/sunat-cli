@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { privateChildEnv } from "./child-process.ts";
 
 export const KEYCHAIN_SERVICE = "sunat-cli";
 
@@ -27,6 +28,7 @@ function commandUnavailable(err: unknown): boolean {
 function run(command: string, args: string[], input?: string): string {
 	return execFileSync(command, args, {
 		encoding: "utf-8",
+		env: privateChildEnv(process.env, [], ["SUNAT_TEST_"]),
 		input,
 		stdio: ["pipe", "pipe", "pipe"],
 	}).trim();
@@ -48,28 +50,39 @@ export function keychainBackend(): "macos" | "linux" | "unsupported" {
 export function setKeychainSecret(key: string, value: string): void {
 	assertSecretKey(key);
 	if (!value) throw new Error("Secret value cannot be empty.");
+	if (/[\r\n]/.test(value)) throw new Error("Secret value cannot contain line breaks.");
 	const backend = keychainBackend();
-	if (backend === "macos") {
-		run("security", ["add-generic-password", "-U", "-s", KEYCHAIN_SERVICE, "-a", key, "-w", value]);
-		return;
+	try {
+		if (backend === "macos") {
+			run("security", ["add-generic-password", "-U", "-s", KEYCHAIN_SERVICE, "-a", key, "-w"], `${value}\n${value}\n`);
+			return;
+		}
+		if (backend === "linux") {
+			run(
+				"secret-tool",
+				["store", "--label", `${KEYCHAIN_SERVICE} ${key}`, "service", KEYCHAIN_SERVICE, "account", key],
+				value,
+			);
+			return;
+		}
+		throw new Error(`${platformName()} is not supported yet.`);
+	} catch {
+		throw new Error(`Could not store ${key} in ${platformName()}.`);
 	}
-	if (backend === "linux") {
-		run("secret-tool", ["store", "--label", `${KEYCHAIN_SERVICE} ${key}`, "service", KEYCHAIN_SERVICE, "account", key], value);
-		return;
-	}
-	throw new Error(`${platformName()} is not supported yet.`);
 }
 
 export function getKeychainSecret(key: string): string | undefined {
 	assertSecretKey(key);
 	const backend = keychainBackend();
 	try {
-		if (backend === "macos") return run("security", ["find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", key, "-w"]) || undefined;
-		if (backend === "linux") return run("secret-tool", ["lookup", "service", KEYCHAIN_SERVICE, "account", key]) || undefined;
+		if (backend === "macos")
+			return run("security", ["find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", key, "-w"]) || undefined;
+		if (backend === "linux")
+			return run("secret-tool", ["lookup", "service", KEYCHAIN_SERVICE, "account", key]) || undefined;
 		return undefined;
 	} catch (err) {
 		if (commandUnavailable(err)) return undefined;
-		throw new Error(`Could not read ${key} from ${platformName()}: ${err instanceof Error ? err.message : String(err)}`);
+		throw new Error(`Could not read ${key} from ${platformName()}.`);
 	}
 }
 
@@ -88,7 +101,7 @@ export function clearKeychainSecret(key: string): boolean {
 		throw new Error(`${platformName()} is not supported yet.`);
 	} catch (err) {
 		if (commandUnavailable(err)) return false;
-		throw new Error(`Could not clear ${key} from ${platformName()}: ${err instanceof Error ? err.message : String(err)}`);
+		throw new Error(`Could not clear ${key} from ${platformName()}.`);
 	}
 }
 
@@ -109,5 +122,5 @@ export function resolveSecret(envNames: readonly string[]): string | undefined {
 }
 
 export function missingSecretMessage(envNames: readonly string[], label = "Secret"): string {
-	return `${label} missing. Set ${envNames.join(" or ")} env var, or store it with: sunat keychain set ${envNames[0]} --value <secret>`;
+	return `${label} missing. Set ${envNames.join(" or ")} env var, or store it with: sunat keychain set ${envNames[0]}`;
 }

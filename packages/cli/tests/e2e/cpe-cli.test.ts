@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const CLI = join(import.meta.dir, "..", "..", "bin", "sunat.ts");
 const tempHomes: string[] = [];
@@ -220,27 +220,34 @@ await run(["factura", "emit", "--params", JSON.stringify({ ...base, serie: "F101
 			.split("\n")
 			.map(
 				(line) =>
-					JSON.parse(line) as { command: string; result: string; details?: { id?: string; emisorRuc?: string } },
+					JSON.parse(line) as {
+						command: string;
+						result: string;
+						details?: { idRef?: string; emisorRef?: string; id?: string; emisorRuc?: string };
+					},
 			)
 			.filter((entry) => entry.command === "cpe factura emit" && entry.result === "success");
 
-		expect(entries.map((entry) => entry.details?.emisorRuc).sort()).toEqual(["20111111111", "20222222222"]);
-		expect(entries.map((entry) => entry.details?.id).sort()).toEqual([
-			"20111111111-01-F101-1",
-			"20222222222-01-F101-1",
-		]);
+		expect(entries).toHaveLength(2);
+		expect(entries.every((entry) => entry.details?.emisorRuc === undefined)).toBe(true);
+		expect(entries.every((entry) => entry.details?.id === undefined)).toBe(true);
+		expect(new Set(entries.map((entry) => entry.details?.emisorRef)).size).toBe(2);
+		expect(new Set(entries.map((entry) => entry.details?.idRef)).size).toBe(2);
 
 		const alphaAudit = await runCliWithEnv(["-o", "json", "audit", "list", "--ruc", "20111111111"], {
 			HOME: home,
 			CPE_DRIVER: "mock",
 		});
 		expect(alphaAudit.exitCode).toBe(0);
-		const alphaJson = parseJson<{ count: number; entries: Array<{ details?: { emisorRuc?: string; id?: string } }> }>(
-			alphaAudit.stdout,
-		);
+		const alphaJson = parseJson<{
+			count: number;
+			entries: Array<{ details?: { emisorRuc?: string; id?: string; emisorRef?: string; idRef?: string } }>;
+		}>(alphaAudit.stdout);
 		expect(alphaJson.count).toBe(1);
-		expect(alphaJson.entries[0]?.details?.emisorRuc).toBe("20111111111");
-		expect(alphaJson.entries[0]?.details?.id).toBe("20111111111-01-F101-1");
+		expect(alphaJson.entries[0]?.details?.emisorRuc).toBeUndefined();
+		expect(alphaJson.entries[0]?.details?.id).toBeUndefined();
+		expect(alphaJson.entries[0]?.details?.emisorRef).toStartWith("hmac-sha256:");
+		expect(alphaJson.entries[0]?.details?.idRef).toStartWith("hmac-sha256:");
 	});
 
 	test("cpe boleta emit --yes succeeds via mock", async () => {

@@ -120,7 +120,7 @@ async function get<T>(path: string): Promise<T> {
 
 		// SUNAT's error envelope: { cod, msg, errors: [{ cod, msg }] }
 		if (!res.ok) {
-			const env = parsed as { cod?: number | string; errors?: Array<{ cod?: number; msg?: string }> };
+			const env = parsed as { cod?: number | string; errors?: Array<{ cod?: number }> };
 			const first = env.errors?.[0];
 			const code = String(first?.cod ?? env.cod ?? res.status);
 			// 42209 is the client-version gate. Surface it verbatim: retrying cannot fix it.
@@ -128,7 +128,7 @@ async function get<T>(path: string): Promise<T> {
 				code === "42209"
 					? "SUNAT bumped its client version. Run 'sunat-cli renta login' to pick up the new one."
 					: undefined;
-			throw new RentaApiError(first?.msg || `HTTP ${res.status}`, res.status, code, hint);
+			throw new RentaApiError(`e-renta request failed with HTTP ${res.status}`, res.status, code, hint);
 		}
 
 		return parsed as T;

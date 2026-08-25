@@ -13,7 +13,7 @@
  * operator can investigate (likely a crash mid-submit).
  */
 
-import { audit, iterateActiveAuditEntries } from "../data/audit.ts";
+import { audit, auditReference, iterateActiveAuditEntries } from "../data/audit.ts";
 import type { CpeResult } from "./drivers/types.ts";
 
 export type CpeTipo = "01" | "03" | "07" | "08" | "09";
@@ -39,22 +39,23 @@ export function idempotencyKey(key: IdempotencyKey): string {
 	return `${key.emisorRuc}-${key.tipo}-${key.serie}-${key.numero}`;
 }
 
+export function idempotencyReference(key: IdempotencyKey): string {
+	return auditReference(idempotencyKey(key));
+}
+
 export function findCachedResult(key: IdempotencyKey): CpeResult | null {
-	const id = idempotencyKey(key);
+	const ref = idempotencyReference(key);
 	for (const entry of iterateAudit()) {
 		if (entry.result !== "success") continue;
-		const entryId = entry.details?.id as string | undefined;
-		if (entryId === id) {
+		if (entry.details?.idRef === ref) {
 			const d = entry.details as Record<string, unknown>;
 			return {
-				id,
+				id: idempotencyKey(key),
 				serie: key.serie,
 				numero: key.numero,
 				hash: (d.hash as string) || "",
 				status: (d.status as CpeResult["status"]) || "accepted",
 				cdrCode: d.cdrCode as string | undefined,
-				cdrDesc: d.cdrDesc as string | undefined,
-				xml: d.xml as string | undefined,
 				ts: entry.timestamp,
 			};
 		}
@@ -77,7 +78,7 @@ export function logPending(key: IdempotencyKey, command: string, args: Record<st
 		command,
 		args,
 		result: "pending",
-		details: { id: idempotencyKey(key), emisorRuc: key.emisorRuc, stage: "pre-submit" },
+		details: { idRef: idempotencyReference(key), emisorRef: auditReference(key.emisorRuc), stage: "pre-submit" },
 	});
 }
 
@@ -92,13 +93,12 @@ export function logSuccess(
 		args,
 		result: "success",
 		details: {
-			id: idempotencyKey(key),
-			emisorRuc: key.emisorRuc,
+			idRef: idempotencyReference(key),
+			emisorRef: auditReference(key.emisorRuc),
 			hash: result.hash,
 			status: result.status,
 			cdrCode: result.cdrCode,
 			cdrDesc: result.cdrDesc,
-			xml: result.xml,
 		},
 	});
 }
@@ -108,7 +108,7 @@ export function logFailure(key: IdempotencyKey, command: string, args: Record<st
 		command,
 		args,
 		result: "error",
-		details: { id: idempotencyKey(key), emisorRuc: key.emisorRuc, error },
+		details: { idRef: idempotencyReference(key), emisorRef: auditReference(key.emisorRuc), error },
 	});
 }
 

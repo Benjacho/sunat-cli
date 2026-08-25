@@ -1,31 +1,35 @@
-import { Command } from "commander";
-import { loadConfig, saveConfig, ensureDirs } from "../data/config.ts";
-import { loginSOL, loginNuevaPlataforma } from "../browser/auth.ts";
-import { outputSuccess, outputError } from "../utils/output.ts";
-import { audit } from "../data/audit.ts";
-import { resolveSecret } from "../data/keychain.ts";
-import { isSkillInstalled, installSkill } from "../utils/skill.ts";
 import * as p from "@clack/prompts";
+import { Command } from "commander";
+import { loginNuevaPlataforma, loginSOL } from "../browser/auth.ts";
+import { audit } from "../data/audit.ts";
+import { ensureDirs, loadConfig, saveConfig } from "../data/config.ts";
+import { resolveSecret } from "../data/keychain.ts";
+import { outputError, outputSuccess } from "../utils/output.ts";
+import { installSkill, isSkillInstalled } from "../utils/skill.ts";
 
 interface LoginOpts {
 	nuevaPlataforma?: boolean;
 	ruc?: string;
 	user?: string;
-	password?: string;
 }
 
-async function getOrPromptCredentials(opts: LoginOpts, isTTY: boolean): Promise<{ ruc: string; usuario: string; password: string }> {
+async function getOrPromptCredentials(
+	opts: LoginOpts,
+	isTTY: boolean,
+): Promise<{ ruc: string; usuario: string; password: string }> {
 	const config = loadConfig();
 	let ruc = opts.ruc || process.env.SUNAT_RUC || config.ruc;
 	let usuario = opts.user || process.env.SUNAT_USER || config.usuario;
-	let password = opts.password || resolveSecret(["SUNAT_PASSWORD"]);
+	let password = resolveSecret(["SUNAT_PASSWORD"]);
 
 	if (ruc && usuario && password) {
 		return { ruc, usuario, password };
 	}
 
 	if (!isTTY) {
-		throw new Error("Missing credentials. Pass --ruc, --user, --password flags, set SUNAT_RUC, SUNAT_USER, SUNAT_PASSWORD env vars, or store SUNAT_PASSWORD with sunat keychain set");
+		throw new Error(
+			"Missing credentials. Pass --ruc and --user, set SUNAT_RUC, SUNAT_USER and SUNAT_PASSWORD, or store SUNAT_PASSWORD with sunat keychain set",
+		);
 	}
 
 	p.intro("sunat login -- first time setup");
@@ -38,7 +42,10 @@ async function getOrPromptCredentials(opts: LoginOpts, isTTY: boolean): Promise<
 				if (!/^\d{11}$/.test(v)) return "RUC must be 11 digits";
 			},
 		});
-		if (p.isCancel(value)) { p.cancel("Login cancelled"); process.exit(0); }
+		if (p.isCancel(value)) {
+			p.cancel("Login cancelled");
+			process.exit(0);
+		}
 		ruc = value;
 	}
 
@@ -50,7 +57,10 @@ async function getOrPromptCredentials(opts: LoginOpts, isTTY: boolean): Promise<
 				if (!v.trim()) return "Required";
 			},
 		});
-		if (p.isCancel(value)) { p.cancel("Login cancelled"); process.exit(0); }
+		if (p.isCancel(value)) {
+			p.cancel("Login cancelled");
+			process.exit(0);
+		}
 		usuario = value;
 	}
 
@@ -61,7 +71,10 @@ async function getOrPromptCredentials(opts: LoginOpts, isTTY: boolean): Promise<
 				if (!v.trim()) return "Required";
 			},
 		});
-		if (p.isCancel(value)) { p.cancel("Login cancelled"); process.exit(0); }
+		if (p.isCancel(value)) {
+			p.cancel("Login cancelled");
+			process.exit(0);
+		}
 		password = value;
 	}
 
@@ -78,7 +91,6 @@ export function createLoginCommand(): Command {
 		.option("--nueva-plataforma", "Login to Nueva Plataforma (requires reCAPTCHA)")
 		.option("--ruc <ruc>", "RUC number (11 digits)")
 		.option("--user <usuario>", "SOL username")
-		.option("--password <clave>", "SOL password")
 		.action(async (opts: LoginOpts, cmd) => {
 			const format = cmd.parent?.opts().output || "table";
 			const portal = opts.nuevaPlataforma ? "nueva-plataforma" : "sol";

@@ -10,6 +10,11 @@ audience: empresas con RUC 20 (B2B), no personas naturales 4ta
 
 # SUNAT CPE Ecosystem — Recon Report
 
+This is a historical design dossier, not an operations guide. Current CLI
+security rules take precedence: secrets are accepted only through interactive
+prompts, environment variables, or the OS keychain. Never put them in flags,
+logs, screenshots, fixtures, or committed files.
+
 ## Overview
 
 Peru obliga emision electronica de comprobantes (CPE) desde 2014, masivamente desde 2018. Hay **3 vias oficiales** para emitir: SEE-Del Contribuyente (sistemas propios), SEE-OSE/PSE (intermediarios), y **SEE-SFS (Facturador SUNAT)** — la app Java gratuita oficial. El Facturador es el rincon mas hostil del stack: Java 8u202 obligatorio, sin auth, sin GC, sin API, configuracion via folders `/DATA` y `/CERT`. Todo wrapper que se le ponga encima es producto. Mercado: crecio 11.9% en 2025, millones de contribuyentes obligados.
@@ -217,7 +222,7 @@ Lo que falta en TODO el ecosystem actual:
 | OpenAPI spec | NO | parcial | NO | si |
 | TypeScript SDK | NO | NO | NO | si |
 
-**Diferencia clave vs sunat-cli (Hunter)**:
+**Diferencia clave vs sunat-cli**:
 - `sunat-cli` = personas naturales, RUC 10, RHE (4ta), F616 (PDT mensual), scraping del SOL
 - `sunat-cpe-api` = empresas, RUC 20, CPE (factura/boleta/NC/ND/guia), SOAP a SUNAT via UBL 2.1
 - Los dos son agent-first pero target audience disjunto. **No compiten, se complementan**.
@@ -354,8 +359,8 @@ Convencion: `cpe {noun} {verb} [args] [flags]`. Binario sugerido: `cpe` (corto, 
 
 | Command | Trust | Description | JSON Output |
 |---------|-------|-------------|-------------|
-| `cpe login --ruc {ruc} --user {sol-user} --password {pwd} [--mode prod\|sandbox]` | T1 | Guarda RUC + user en `~/.cpe/config.json`. Pwd solo en env var o `--password`. | `{ ok, ruc, mode }` |
-| `cpe cert install --pfx ./cert.pfx --password {pwd}` | T1 | Importa certificado X.509 a `~/.cpe/certs/{ruc}.pfx` con permisos 0600. | `{ ok, ruc, validUntil, issuer }` |
+| `sunat keychain set CPE_SOL_PASSWORD` | T1 | Guarda la Clave SOL mediante un prompt oculto del keychain del sistema. | `{ success, key }` |
+| `sunat keychain set CPE_CERT_PASSWORD` | T1 | Guarda la clave PFX mediante un prompt oculto del keychain del sistema. | `{ success, key }` |
 | `cpe driver set facturador\|sunat-direct\|nubefact\|apisperu` | T1 | Cambia driver. Persiste en config. | `{ driver }` |
 | `cpe webhook register --url {url} --events {emit,fail,cdr} [--secret {hmac}]` | T1 | Registra webhook local que se dispara con eventos | `{ id, url, events }` |
 
@@ -569,9 +574,9 @@ Selectable via `cpe driver set <name>` o env `CPE_DRIVER`. Cambia el backend, NO
 7. **Distribucion**: npm? GitHub releases con binarios? Docker image? — Las tres, en ese orden.
 8. **MCP server features**: ¿incluir tools para read-only catalogos directamente? Si.
 
-## Diferenciacion vs sunat-cli (Hunter)
+## Diferenciacion vs sunat-cli
 
-| Eje | sunat-cli (Hunter) | sunat-cpe-api (target wrapper) |
+| Eje | sunat-cli | sunat-cpe-api (target wrapper) |
 |-----|--------------------|---------------------------|
 | Audiencia | Personas naturales (RUC 10) | Empresas (RUC 20) |
 | Documentos | RHE (recibo honorarios), F616 (PDT 4ta), Anual | Factura, Boleta, NC, ND, Guia, RET, PERC |
@@ -810,10 +815,10 @@ Standard CS biome config (single quotes, 2 spaces, trailing comma, ordered impor
 
 ### SUNAT auth flow
 
-1. `cpe login --ruc 20... --user XXX --password $CPE_SOL_PASSWORD --mode prod`
-   - Persiste RUC + user en config. Password NO se persiste.
+1. Configura RUC + user y ejecuta `sunat keychain set CPE_SOL_PASSWORD`.
+   - Persiste solo RUC + user en config. Password NO se persiste.
    - Validacion: hace `getStatus("0000000000")` a SUNAT con esos creds. Si SUNAT responde 401, falla.
-2. `cpe cert install --pfx ./mycert.pfx --password $CPE_CERT_PASSWORD`
+2. Configura el PFX y ejecuta `sunat keychain set CPE_CERT_PASSWORD`.
    - Copia PFX a `~/.cpe/certs/{ruc}.pfx` con perms 0600.
    - Extrae validUntil, issuer, subject.
    - Password del cert: idem env var o keychain del OS.
@@ -932,7 +937,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
-      - run: bun install
+      - run: npm ci
       - run: bun run lint
       - run: bun run typecheck
       - run: bun test
@@ -1019,8 +1024,8 @@ cpe schema factura.emit --json
 
 ```bash
 cpe doctor --json                                           # Verifica deps
-cpe login --ruc 20... --user XXXX --password $CPE_SOL_PASSWORD --mode prod
-cpe cert install --pfx ./cert.pfx --password $CPE_CERT_PASSWORD
+sunat keychain set CPE_SOL_PASSWORD
+sunat keychain set CPE_CERT_PASSWORD
 cpe driver set sunat-direct                                 # o `facturador`, `nubefact`, `apisperu`, `mock`
 cpe doctor --json                                           # Re-verifica
 ```
@@ -1176,11 +1181,10 @@ LegalMonetaryTotal with LineExtensionAmount + TaxInclusiveAmount + PayableAmount
 ```
 RUC      = 20000000001
 SOL_USER = MODDATOS
-SOL_PASS = moddatos
 WS_USER  = ${RUC}${SOL_USER}  → "20000000001MODDATOS"
 
 Cert: Greenter test PEM (https://github.com/thegreenter/greenter/blob/master/packages/lite/tests/Resources/SFSCert.pem)
-Convert to PFX with: openssl pkcs12 -export -in SFSCert.pem -out test.pfx -password pass:test123
+Use a locally generated test-certificate password and keep it outside shell history.
 ```
 
 ## Endpoints
