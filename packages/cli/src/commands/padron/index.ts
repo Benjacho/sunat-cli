@@ -2,6 +2,7 @@ import { Command } from "commander";
 import type { PadronEntry } from "../../sunat-rest/padron-local.ts";
 import { isStale, loadMeta, lookupRuc, lookupRucBatch, syncPadron } from "../../sunat-rest/padron-local.ts";
 import { audit } from "../../data/audit.ts";
+import { emitNextSteps } from "../../utils/next-steps.ts";
 import { output, outputError } from "../../utils/output.ts";
 import { bold, dim, muted, ok, warn } from "../../utils/style.ts";
 
@@ -121,6 +122,10 @@ export function createPadronCommand(): Command {
 					return;
 				}
 				output(format, { json: { synced: false, hint: "Run: sunat padron sync" } });
+				emitNextSteps(
+					[{ command: "sunat-cli padron sync", description: "download the padrón for the first time" }],
+					format,
+				);
 				return;
 			}
 
@@ -150,6 +155,10 @@ export function createPadronCommand(): Command {
 					sha256: `${meta.zipSha256.slice(0, 16)}...`,
 				},
 			});
+			emitNextSteps(
+				stale ? [{ command: "sunat-cli padron sync", description: "the local copy is out of date" }] : [],
+				format,
+			);
 		});
 
 	padron
