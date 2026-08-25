@@ -121,7 +121,7 @@ export function createPadronCommand(): Command {
 					console.log(dim("  Run: sunat-cli padron sync"));
 					return;
 				}
-				output(format, { json: { synced: false, hint: "Run: sunat padron sync" } });
+				output(format, { json: { synced: false, hint: "Run: sunat-cli padron sync" } });
 				emitNextSteps(
 					[{ command: "sunat-cli padron sync", description: "download the padrón for the first time" }],
 					format,
