@@ -1,4 +1,18 @@
-import { execFileSync } from "node:child_process";
+import type { ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from "node:child_process";
+import { createRequire } from "node:module";
+import crossSpawn from "cross-spawn";
+
+const require = createRequire(import.meta.url);
+const crossSpawnPath = require.resolve("cross-spawn");
+const nodeProxy =
+	'const spawn=require(process.argv[1]);const child=spawn("agent-browser",process.argv.slice(2),{stdio:"inherit",env:process.env});child.on("error",error=>process.exit(error&&error.code==="ENOENT"?127:1));child.on("exit",(code,signal)=>{if(signal)process.kill(process.pid,signal);else process.exit(code??1)});';
+
+function invocation(args: string[]): { command: string; args: string[] } {
+	if (process.platform === "win32" && process.versions.bun) {
+		return { command: "node", args: ["-e", nodeProxy, "--", crossSpawnPath, ...args] };
+	}
+	return { command: "agent-browser", args };
+}
 
 export const AGENT_BROWSER_INSTALL = [
 	"npm install -g agent-browser      # all platforms",
@@ -37,15 +51,31 @@ export type BinaryStatus = {
 	hint?: string;
 };
 
+export function spawnAgentBrowser(args: string[], options: SpawnOptionsWithoutStdio): ChildProcessWithoutNullStreams {
+	const target = invocation(args);
+	return crossSpawn(target.command, target.args, options) as ChildProcessWithoutNullStreams;
+}
+
+export function requireAgentBrowser(status: BinaryStatus = probeAgentBrowser()): void {
+	if (status.installed) return;
+	if (status.hint === AGENT_BROWSER_INSTALL) throw missingBinaryError();
+	throw new Error(status.hint || "agent-browser is unavailable");
+}
+
 /** Cheap presence probe for `doctor`. Never throws. */
-export function probeAgentBrowser(): BinaryStatus {
+export function probeAgentBrowser(env: NodeJS.ProcessEnv = process.env): BinaryStatus {
 	try {
-		const out = execFileSync("agent-browser", ["--version"], {
+		const target = invocation(["--version"]);
+		const result = crossSpawn.sync(target.command, target.args, {
 			encoding: "utf-8",
+			env,
 			timeout: 10000,
 			stdio: ["ignore", "pipe", "ignore"],
 		});
-		return { installed: true, version: out.trim() };
+		if (result.error) throw result.error;
+		if (result.status === 127) throw Object.assign(new Error("agent-browser was not found"), { code: "ENOENT" });
+		if (result.status !== 0) throw new Error(`agent-browser --version exited with status ${result.status}`);
+		return { installed: true, version: result.stdout.trim() };
 	} catch (err) {
 		if (isMissingBinary(err)) {
 			return { installed: false, hint: AGENT_BROWSER_INSTALL };
