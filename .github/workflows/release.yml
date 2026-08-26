@@ -184,7 +184,18 @@ jobs:
           done
           test "$(./node_modules/.bin/sunat-cli --version)" = "$VERSION"
           ./node_modules/.bin/sunat-cli --help | grep -q "cpe"
-          npm install --ignore-scripts --package-lock-only "@crafter/sunat-cli@$VERSION" --registry https://registry.npmjs.org
+          # The lockfile resolution hits the registry too, and it was the one
+          # install in this step still lacking a retry. 0.12.0 failed here with
+          # ETARGET while the install above it, which does retry, had already
+          # succeeded: the same propagation delay, caught by the one line that
+          # was not guarded.
+          for attempt in $(seq 1 15); do
+            if npm install --ignore-scripts --package-lock-only "@crafter/sunat-cli@$VERSION" --registry https://registry.npmjs.org; then
+              break
+            fi
+            test "$attempt" != "15"
+            sleep 20
+          done
           npm audit signatures
 
       # Runs even when a check above failed. Publish happens before any of
