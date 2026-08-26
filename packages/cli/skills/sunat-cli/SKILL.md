@@ -346,12 +346,12 @@ Same flow for RCE (Compras):
 ```bash
 sunat-cli sire compras periodos
 sunat-cli sire compras propuesta --periodo 202404 --wait --out compras-202404.zip
-sunat-cli sire compras ticket --num 20240100000123 --wait
+sunat-cli sire compras ticket --num 20240100000123 --periodo 202404 --wait
 ```
 
 Polling: `--wait` polls getStatus with backoff (2s/4s/8s/16s/30s, max 5min).
 Without `--wait`, returns the ticket and you poll independently with
-`sunat-cli sire {ventas|compras} ticket --num <id> [--wait]`.
+`sunat-cli sire {ventas|compras} ticket --num <id> --periodo <YYYYMM> [--wait]` (SUNAT lists tickets per period; the number alone is not queryable).
 
 ### Tipo de Cambio oficial SUNAT
 

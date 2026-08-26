@@ -6,6 +6,7 @@ import { getApiCredentials, getCredentials } from "../../data/config.ts";
 import { writePrivateOutputFile } from "../../data/private-storage.ts";
 import {
 	aceptarPropuestaRvie,
+	archivoDeTicket,
 	COD_LIBRO,
 	type CodLibro,
 	consultarTicket,
@@ -162,7 +163,7 @@ function bookCommand(libroAlias: "ventas" | "compras", codLibro: CodLibro): Comm
 					output(format, {
 						json: {
 							numTicket,
-							hint: `Poll status with: sunat-cli sire ${libroAlias} ticket --num ${numTicket}`,
+							hint: `Poll status with: sunat-cli sire ${libroAlias} ticket --num ${numTicket} --periodo ${opts.periodo}`,
 						},
 					});
 					return;
@@ -171,6 +172,7 @@ function bookCommand(libroAlias: "ventas" | "compras", codLibro: CodLibro): Comm
 				const result = await pollTicket({
 					creds,
 					numTicket,
+					perTributario: opts.periodo,
 					timeoutMs: Number.parseInt(opts.timeout, 10),
 				});
 
@@ -182,16 +184,9 @@ function bookCommand(libroAlias: "ventas" | "compras", codLibro: CodLibro): Comm
 				}
 
 				const archivos = result.archivoReporte || [];
-				if (opts.out && archivos[0]) {
-					const buf = await descargarArchivo(
-						{
-							nomArchivoReporte: archivos[0].nomArchivoReporte,
-							codTipoArchivoReporte: archivos[0].codTipoArchivoReporte || "0",
-							codLibro,
-							perTributario: opts.periodo,
-						},
-						creds,
-					);
+				const archivo = archivoDeTicket(result, codLibro, opts.periodo);
+				if (opts.out && archivo) {
+					const buf = await descargarArchivo(archivo, creds);
 					writePrivateOutputFile(opts.out, buf);
 					output(format, {
 						json: {
@@ -212,8 +207,8 @@ function bookCommand(libroAlias: "ventas" | "compras", codLibro: CodLibro): Comm
 						state: result.state,
 						statusDesc: result.statusDesc,
 						archivoReporte: archivos,
-						hint: archivos[0]
-							? `Download with: sunat-cli sire ${libroAlias} archivo --nombre ${archivos[0].nomArchivoReporte} --periodo ${opts.periodo} --out path`
+						hint: archivo
+							? `Download with: sunat-cli sire ${libroAlias} archivo --nombre ${archivo.nomArchivoReporte} --periodo ${opts.periodo} --ticket ${numTicket} --proceso ${archivo.codProceso} --tipo ${archivo.codTipoArchivoReporte} --out path`
 							: undefined,
 					},
 				});
@@ -226,6 +221,7 @@ function bookCommand(libroAlias: "ventas" | "compras", codLibro: CodLibro): Comm
 		.command("ticket")
 		.description("Consultar estado de un ticket SIRE. T0.")
 		.requiredOption("--num <ticket>", "Número de ticket")
+		.requiredOption("--periodo <YYYYMM>", "Periodo del ticket (SUNAT lista tickets por periodo, no por número)")
 		.option("--wait", "Poll until completed/error")
 		.option("--timeout <ms>", "Polling timeout", "300000")
 		.action(async (opts, cmd) => {
@@ -233,10 +229,15 @@ function bookCommand(libroAlias: "ventas" | "compras", codLibro: CodLibro): Comm
 			try {
 				const creds = resolveSireCreds();
 				if (opts.wait) {
-					const result = await pollTicket({ creds, numTicket: opts.num, timeoutMs: Number.parseInt(opts.timeout, 10) });
-					output(format, { json: { numTicket: opts.num, ...result } });
+					const result = await pollTicket({
+						creds,
+						numTicket: opts.num,
+						perTributario: opts.periodo,
+						timeoutMs: Number.parseInt(opts.timeout, 10),
+					});
+					output(format, { json: result });
 				} else {
-					const status = await consultarTicket(opts.num, creds);
+					const status = await consultarTicket(opts.num, creds, opts.periodo);
 					output(format, { json: status });
 				}
 			} catch (err) {
@@ -249,8 +250,10 @@ function bookCommand(libroAlias: "ventas" | "compras", codLibro: CodLibro): Comm
 		.description("Descargar un archivo previamente generado por un ticket Terminado. T0.")
 		.requiredOption("--nombre <name>", "nomArchivoReporte from a completed ticket")
 		.requiredOption("--periodo <YYYYMM>")
+		.requiredOption("--ticket <num>", "The ticket that produced the file")
 		.requiredOption("--out <path>", "Path to write the file")
-		.option("--tipo <code>", "codTipoArchivoReporte (default 0 = TXT)", "0")
+		.option("--proceso <code>", "codProceso of that ticket (10 = exportar propuesta)", "10")
+		.option("--tipo <code>", "codTipoArchivoReporte as listed on the ticket", "00")
 		.action(async (opts, cmd) => {
 			const format = getFormat(cmd);
 			try {
@@ -261,6 +264,8 @@ function bookCommand(libroAlias: "ventas" | "compras", codLibro: CodLibro): Comm
 						codTipoArchivoReporte: opts.tipo,
 						codLibro,
 						perTributario: opts.periodo,
+						codProceso: opts.proceso,
+						numTicket: opts.ticket,
 					},
 					creds,
 				);
@@ -389,7 +394,7 @@ function bookCommand(libroAlias: "ventas" | "compras", codLibro: CodLibro): Comm
 						numTicket: result.numTicket || null,
 						uploadUrl: result.uploadUrl,
 						hint: result.numTicket
-							? `Poll status with: sunat-cli sire ${libroAlias} ticket --num ${result.numTicket}`
+							? `Poll status with: sunat-cli sire ${libroAlias} ticket --num ${result.numTicket} --periodo ${opts.periodo}`
 							: "No ticket extracted from upload location. Inspect uploadUrl + run consultaestadotickets manually.",
 					},
 				});
@@ -399,6 +404,7 @@ function bookCommand(libroAlias: "ventas" | "compras", codLibro: CodLibro): Comm
 			const polled = await pollTicket({
 				creds,
 				numTicket: result.numTicket,
+				perTributario: opts.periodo,
 				timeoutMs: Number.parseInt(opts.timeout, 10),
 			});
 			output(format, {
@@ -440,7 +446,10 @@ function bookCommand(libroAlias: "ventas" | "compras", codLibro: CodLibro): Comm
 						details: result as unknown as Record<string, unknown>,
 					});
 					output(format, {
-						json: { ...result, hint: `Poll status with: sunat-cli sire ventas ticket --num ${result.numTicket}` },
+						json: {
+							...result,
+							hint: `Poll status with: sunat-cli sire ventas ticket --num ${result.numTicket} --periodo ${opts.periodo}`,
+						},
 					});
 				} catch (err) {
 					outputError(err instanceof Error ? err.message : String(err), format);
@@ -460,20 +469,23 @@ function bookCommand(libroAlias: "ventas" | "compras", codLibro: CodLibro): Comm
 					const creds = resolveSireCreds();
 					const numTicket = await descargarRvie(opts.periodo, creds);
 					if (!opts.wait) {
-						output(format, { json: { numTicket, hint: `Poll: sunat-cli sire ventas ticket --num ${numTicket}` } });
+						output(format, {
+							json: {
+								numTicket,
+								hint: `Poll: sunat-cli sire ventas ticket --num ${numTicket} --periodo ${opts.periodo}`,
+							},
+						});
 						return;
 					}
-					const result = await pollTicket({ creds, numTicket, timeoutMs: Number.parseInt(opts.timeout, 10) });
-					if (result.state === "completed" && opts.out && result.archivoReporte?.[0]) {
-						const buf = await descargarArchivo(
-							{
-								nomArchivoReporte: result.archivoReporte[0].nomArchivoReporte,
-								codTipoArchivoReporte: result.archivoReporte[0].codTipoArchivoReporte || "0",
-								codLibro,
-								perTributario: opts.periodo,
-							},
-							creds,
-						);
+					const result = await pollTicket({
+						creds,
+						numTicket,
+						perTributario: opts.periodo,
+						timeoutMs: Number.parseInt(opts.timeout, 10),
+					});
+					const archivo = result.state === "completed" ? archivoDeTicket(result, codLibro, opts.periodo) : null;
+					if (archivo && opts.out) {
+						const buf = await descargarArchivo(archivo, creds);
 						writePrivateOutputFile(opts.out, buf);
 						output(format, { json: { numTicket, ...result, file: opts.out, bytes: buf.length } });
 						return;

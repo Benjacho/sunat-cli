@@ -9,11 +9,11 @@ Research notes for `src/sunat-rest/sire.ts` (added in PR #4).
 | OAuth password grant (SIRE-specific) | `POST /v1/clientessol/{cid}/oauth2/token/` | Manual SUNAT v22 page 21 |
 | Listar periodos RVIE/RCE | `GET /v1/contribuyente/migeigv/libros/rvierce/padron/web/omisos/{codLibro}/periodos` | Manual page 22 |
 | Aceptar propuesta RVIE | `POST /v1/contribuyente/migeigv/libros/rvie/propuesta/web/propuesta/{periodo}/aceptapropuesta` | Manual page 31 |
-| Descargar propuesta RVIE (async) | `GET /v1/contribuyente/migeigv/libros/rvierce/gestionprocesosmasivos/web/masivo/exportapropuesta` | Manual page 45 |
-| Descargar propuesta RCE (async) | `GET /v1/contribuyente/migeigv/libros/rce/propuesta/web/propuesta/{periodo}/exportacioncomprobantepropuesta` | Manual SIRE Compras |
+| Descargar propuesta RVIE (async) | `GET /v1/contribuyente/migeigv/libros/rvie/propuesta/web/propuesta/{periodo}/exportapropuesta?codTipoArchivo=0` | Manual API Registro de Ventas v30 (22/06/2026) §5.18; verified live 2026-08-25. The v22 route under `gestionprocesosmasivos` no longer exists (gateway answers nginx 500). |
+| Descargar propuesta RCE (async) | `GET /v1/contribuyente/migeigv/libros/rce/propuesta/web/propuesta/{periodo}/exportacioncomprobantepropuesta?codTipoArchivo=0&codOrigenEnvio=2` | Manual SIRE Compras v28 (13/08/2025) §5.34; verified live 2026-08-25. 422 without `codOrigenEnvio`. |
 | Descargar RVIE generado (async) | `GET /v1/contribuyente/migeigv/libros/rvierce/gestionprocesosmasivos/web/masivo/exportarregistropropuesta` | Manual page 57 |
-| Consultar estado ticket | `GET /v1/contribuyente/migeigv/libros/rvierce/gestionprocesosmasivos/web/masivo/consultaestadotickets` | Manual page 40 |
-| Descargar archivo generado | `GET /v1/contribuyente/migeigv/libros/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte` | Manual page 43 |
+| Consultar estado ticket | `GET /v1/contribuyente/migeigv/libros/rvierce/gestionprocesosmasivos/web/masivo/consultaestadotickets?perIni={periodo}&perFin={periodo}&numTicket=…&page=1&perPage=50` | Manual API Registro de Ventas v30 §5.16; verified live 2026-08-25. `perIni`/`perFin` mandatory (422 without). |
+| Descargar archivo generado | `GET /v1/contribuyente/migeigv/libros/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte?nomArchivoReporte&codTipoArchivoReporte&codLibro&perTributario&codProceso&numTicket` | Manual API Registro de Ventas v30 §5.17 (parameter table; the URL template there omits the last three); verified live 2026-08-26. 500 without `codProceso` or `numTicket`. |
 
 ## What this PR does NOT ship
 
