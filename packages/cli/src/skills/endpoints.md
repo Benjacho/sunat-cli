@@ -87,6 +87,30 @@ SUNAT publishes a rate for every calendar day, weekends included.
 | `15.1.1.1.1` | Consulta de Valores Pendientes de Pago |
 | `12.1.1.1.4` | Consulta de Declaraciones Juradas y Pagos |
 
+### RHE emission
+
+Menu SOL action `11.5.1.1.2` mints a fresh entry URL. A direct GET of that URL
+needs no imported browser cookies and creates the RHE form session. Every later
+stage posts to `/ol-ti-itreciboelectronico/cpelec001Alias`:
+
+| Stage | `accion` |
+|---|---|
+| Deduction | `RHEDeduccion1` |
+| Identity | `CapturaDatosReciboHonorariosIdentidad` |
+| Details and server preview | `CapturaDatosReciboHonorarios` |
+| Production submission | `GrabaReciboHonorarios` |
+| Issued XML | `descargarreciboxml1` |
+| Issued PDF | `descargarrecibopdf1` |
+
+The entry URL carries six required query fields: `accion`, `p`, `tenc`, `prg`,
+`fecenv` and `usub`. Treat the whole URL as a secret. Direct HTTP is verified
+through preview for `CONTADO` + `SIN DOCUMENTO`; the final submission remains a
+browser confirmation. The confirmation HTML contains two same-endpoint POST
+forms with only the XML and PDF actions above. The original HAR did not capture
+their responses, so the CLI validates the returned XML structure and PDF
+signature before saving them. The raw HAR is private and excluded from the
+repository.
+
 ### Reporte Tributario para Terceros
 
 `/ol-ti-itreportetri/reportetri.htm` → tick `#chkAceptar`, then `#btnAceptar`,
@@ -107,10 +131,32 @@ Period format is `MMAAAA`, **6 characters, no slash**, and **the range cannot
 exceed 6 months**. There is no general "constancia de no adeudo" for internal
 taxes; this listing is the closest thing, and it exports to a file.
 
+## Buzón SOL metadata
+
+Base: `https://ww1.sunat.gob.pe/ol-ti-itvisornoti/visor`
+
+| Method | Path | Purpose | Status |
+|---|---|---|---|
+| GET | `/ajax/listarCarpetas` | folder metadata | observed 200 |
+| POST | `/consultarAlertas` | alert metadata | observed 200 |
+| GET | `/listNotiMenPag` | paginated messages and notifications | observed 200 |
+| GET | `/obtenerDetalleNotiMen` | body and attachments | blocked, not called by the CLI |
+
+`tipoMsj=1` selects messages and `tipoMsj=2` selects notifications. Pagination
+also sends `codCarpeta=00`, `page`, `tipoOrden=NADA`, and empty filters.
+
+The visor requests detail automatically when it loads. `buzon list` installs a
+browser route before entering the visor, so that request is blocked locally and
+cannot update read state at SUNAT. The CLI then fetches only metadata inside the
+authenticated cross-origin frame.
+
+The response fields `total`, `records` and `rows.length` are not equivalent and
+have contradicted each other live. The CLI preserves them separately.
+
 ## Login
 
 ```
-GET e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm
+GET e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm?pestana=*&agrupacion=*
 GET api-seguridad.sunat.gob.pe/v1/clientessol/4f3b88b3-.../oauth2/authen
 GET api-seguridad.sunat.gob.pe/v1/clientessol/4f3b88b3-.../oauth2/loginMenuSol
 ```

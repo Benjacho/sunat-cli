@@ -1,6 +1,6 @@
 import type { Locale } from "./i18n";
 
-export const VERSION = "0.11.2";
+export const VERSION = "0.15.0";
 
 /**
  * Copy lives per locale rather than as a key/value dictionary with one canonical
@@ -35,11 +35,21 @@ export type Content = {
 		roadmap: string;
 		principles: string;
 	};
-	a11y: { skip: string; sections: string; theme: string; language: string; home: string };
+	a11y: {
+		skip: string;
+		sections: string;
+		theme: string;
+		language: string;
+		home: string;
+	};
 	theme: { light: string; system: string; dark: string };
 	hero: { lede: string; cta: string };
 	stats: Stat[];
-	capabilities: { heading: string; count: (n: number) => string; items: Capability[] };
+	capabilities: {
+		heading: string;
+		count: (n: number) => string;
+		items: Capability[];
+	};
 	architecture: {
 		heading: string;
 		prose: string[];
@@ -64,7 +74,7 @@ const es: Content = {
 	meta: {
 		title: "sunat-cli — automatiza SUNAT desde la terminal",
 		description:
-			"CLI que envuelve nueve superficies de SUNAT: comprobantes electrónicos, SIRE, guías de remisión, recibos por honorarios y F616, y las APIs REST. Pensada para que un agente la opere sin romper nada.",
+			"CLI que envuelve diez superficies de SUNAT: comprobantes electrónicos, SIRE, guías de remisión, Buzón SOL, recibos por honorarios y F616, y las APIs REST. Pensada para que un agente la opere sin romper nada.",
 	},
 	nav: {
 		capabilities: "Qué cubre",
@@ -82,13 +92,13 @@ const es: Content = {
 	},
 	theme: { light: "Claro", system: "Sistema", dark: "Oscuro" },
 	hero: {
-		lede: "SUNAT expone nueve superficies distintas: SOAP con XML firmado, REST con OAuth, una cola de tickets, una carga reanudable, y un formulario que en realidad es una API JSON. Esto las envuelve todas en un binario que un agente puede manejar.",
+		lede: "SUNAT expone diez superficies distintas: SOAP con XML firmado, REST con OAuth, una cola de tickets, una carga reanudable, un buzón legacy, una API JSON y una sesión de formularios HTTP. Esto las envuelve en un binario que un agente puede manejar bajo supervisión.",
 		cta: "Ver qué cubre",
 	},
 	stats: [
-		{ value: "9", label: "Superficies", detail: "un solo binario" },
-		{ value: "283", label: "Tests", detail: "en verde contra beta" },
-		{ value: "0", label: "CAPTCHAs", detail: "un login y después headless" },
+		{ value: "10", label: "Superficies", detail: "un solo binario" },
+		{ value: "500+", label: "Tests", detail: "en verde" },
+		{ value: "2", label: "Modos", detail: "headless y supervisado" },
 	],
 	capabilities: {
 		heading: "Qué cubre",
@@ -121,14 +131,20 @@ const es: Content = {
 			{
 				title: "Rentas de cuarta",
 				scope: "RHE y F616",
-				desc: "Login en el navegador sin CAPTCHA. Los recibos se emiten en lote y el F616 mensual se lee headless desde la API que hay detrás del formulario.",
-				code: "$ sunat-cli f616 declare \\\n    --json '{\"periodo\":\"2026-03\"}'",
+				desc: "En RHE, el navegador obtiene la entrada SOL, HTTP llega al borrador, la confirmación legal queda supervisada y la descarga XML/PDF está conectada para validarla en la próxima emisión real. F616 conserva su lectura headless por API.",
+				code: '$ sunat-cli rhe emit \\\n    --params \'{"empresa":"Cliente","descripcion":"Servicio","monto":100}\' --preview-only',
 			},
 			{
 				title: "Consultas",
 				scope: "Padrón RUC, consulta CPE, tipo de cambio",
 				desc: "OAuth2 client credentials contra la superficie REST pública. El padrón sincroniza incremental, así que una consulta local responde en menos de un milisegundo.",
 				code: "$ sunat-cli api consulta \\\n    --tipo 01 --serie F001 --numero 123",
+			},
+			{
+				title: "Buzón SOL",
+				scope: "Mensajes y notificaciones, solo metadata",
+				desc: "Lista sin abrir el detalle, conserva conteos contradictorios como evidencia y detecta novedades con un snapshot privado local.",
+				code: "$ sunat-cli buzon list",
 			},
 			{
 				title: "Secretos en el llavero del sistema",
@@ -145,34 +161,39 @@ const es: Content = {
 		],
 	},
 	architecture: {
-		heading: "Headless después de un solo login",
+		heading: "Endpoints primero, navegador en el borde",
 		prose: [
 			"La página del F616 parece un formulario. Es una aplicación de una sola página hablando con una API JSON, y los campos del formulario son la forma menos confiable de llegar ahí.",
-			"Entonces la CLI abre el navegador una vez, captura el token de sesión y lo cierra. Todas las lecturas posteriores van directo a la API que el formulario estaba llamando. Sin CAPTCHA, sin DOM que pelear, sin un proceso de navegador abierto.",
+			"RHE es distinto: Menu SOL genera una entrada efímera y el backend responde HTML. La CLI usa HTTP para deducción, identidad y detalles, vuelve a renderizar el borrador, reserva el DOM para la confirmación legal y conecta XML/PDF por endpoint después de emitir.",
 		],
 		steps: [
 			{
 				n: "01",
-				title: "Capturar",
-				desc: "Abre el navegador una vez, inicia sesión, toma el token y lo cierra.",
+				title: "Bootstrap",
+				desc: "Abre SOL y obtiene la entrada o token que la superficie oficial exige.",
 			},
 			{
 				n: "02",
-				title: "Leer headless",
-				desc: "Consulta la API de la declaración directamente con el token en caché, sin navegador corriendo.",
+				title: "HTTP directo",
+				desc: "Llama la API o sesión de formularios y valida la respuesta real del servidor.",
 			},
 			{
 				n: "03",
-				title: "Recapturar al vencer",
-				desc: "Cuando el token expira, captura de nuevo. Todo lo que pasa entre esos dos momentos es headless.",
+				title: "Confirmar",
+				desc: "Para RHE, mantiene la acción legal bajo control humano y después valida y guarda los archivos si SUNAT responde con XML/PDF reales.",
 			},
 		],
 	},
 	coverage: {
 		heading: "Hasta dónde llega cada superficie",
 		shipped: (n, total) => `${n} de ${total} en producción y verificadas`,
-		note: "Los porcentajes son un juicio sobre cuánto de cada superficie está envuelto, validado contra el endpoint beta y disponible para un agente. La última fila es la que más importa y es la más baja: nada de esto se ha ejecutado con credenciales de producción.",
-		th: { surface: "Superficie", wrapped: "Cubierto", pct: "%", state: "Estado" },
+		note: "Los porcentajes son un juicio sobre cuánto de cada superficie está envuelto y disponible para un agente. El lector de metadata del Buzón SOL fue verificado con una cuenta propia en producción. Los envíos tributarios siguen en beta.",
+		th: {
+			surface: "Superficie",
+			wrapped: "Cubierto",
+			pct: "%",
+			state: "Estado",
+		},
 		caption: "Cobertura por superficie de SUNAT, con avance y estado",
 		states: {
 			shipped: "listo",
@@ -189,9 +210,15 @@ const es: Content = {
 			},
 			{
 				domain: "RHE y F616",
-				detail: "Personas naturales",
-				pct: 95,
-				state: "shipped",
+				detail: "RHE supervisado; XML/PDF conectado, falta live",
+				pct: 85,
+				state: "partial",
+			},
+			{
+				domain: "Buzón SOL",
+				detail: "Metadata, snapshot y novedades",
+				pct: 45,
+				state: "partial",
 			},
 			{
 				domain: "Comprobantes",
@@ -243,7 +270,9 @@ const es: Content = {
 		cols: [
 			{
 				when: "Ahora",
-				items: [{ n: 10, t: "Baja con intent token y su barrera de seguridad" }],
+				items: [
+					{ n: 10, t: "Baja con intent token y su barrera de seguridad" },
+				],
 			},
 			{
 				when: "Después",
@@ -258,7 +287,10 @@ const es: Content = {
 				items: [
 					{ n: 13, t: "Driver facturador, wrapper de Java contenido" },
 					{ n: 14, t: "Reportes complementarios de SIRE" },
-					{ n: 15, t: "Índice sqlite para consultas de padrón sub-milisegundo" },
+					{
+						n: 15,
+						t: "Índice sqlite para consultas de padrón sub-milisegundo",
+					},
 					{ n: 16, t: "Jobs de humo en CI con navegador real" },
 					{ n: 17, t: "Reanudar una carga TUS parcial" },
 				],
@@ -282,7 +314,7 @@ const es: Content = {
 			},
 			{
 				rule: "Toda mutación se previsualiza",
-				why: "--dry-run devuelve la misma forma que la llamada real, con un hash, así se puede comparar antes de confirmar.",
+				why: "En RHE, --dry-run valida localmente y --preview-only reconcilia el borrador real de SUNAT antes de habilitar la emisión.",
 			},
 			{
 				rule: "JSON cuando stdout no es una terminal",
@@ -315,7 +347,7 @@ const en: Content = {
 	meta: {
 		title: "sunat-cli — agent-first tax automation for Peru",
 		description:
-			"A command-line tool that wraps nine SUNAT surfaces: electronic invoices, ledgers, shipping notices, independent worker filings, and REST lookups. Built so an AI agent can operate it safely.",
+			"A command-line tool that wraps ten SUNAT surfaces: electronic invoices, ledgers, shipping notices, Buzón SOL, independent worker filings, and REST lookups. Built so an AI agent can operate it safely.",
 	},
 	nav: {
 		capabilities: "Capabilities",
@@ -333,13 +365,13 @@ const en: Content = {
 	},
 	theme: { light: "Light", system: "System", dark: "Dark" },
 	hero: {
-		lede: "Peru's tax authority exposes nine different surfaces: SOAP with signed XML, REST with OAuth, a ticket queue, a resumable upload, and a form that is really a JSON API. This wraps all of them in one binary an agent can drive.",
+		lede: "Peru's tax authority exposes ten different surfaces: SOAP with signed XML, REST with OAuth, a ticket queue, a resumable upload, a legacy inbox, a JSON API, and a stateful HTTP form session. This wraps them in one supervised agent-facing binary.",
 		cta: "See what it covers",
 	},
 	stats: [
-		{ value: "9", label: "Surfaces", detail: "one binary" },
-		{ value: "283", label: "Tests", detail: "green against beta" },
-		{ value: "0", label: "CAPTCHAs", detail: "one login, then headless" },
+		{ value: "10", label: "Surfaces", detail: "one binary" },
+		{ value: "500+", label: "Tests", detail: "green" },
+		{ value: "2", label: "Modes", detail: "headless and supervised" },
 	],
 	capabilities: {
 		heading: "What it covers",
@@ -372,14 +404,20 @@ const en: Content = {
 			{
 				title: "Independent worker filings",
 				scope: "RHE and F616",
-				desc: "Browser login without a CAPTCHA. Receipts issue in batch; the monthly F616 reads headless from the declaration API behind the form.",
-				code: "$ sunat-cli f616 declare \\\n    --json '{\"periodo\":\"2026-03\"}'",
+				desc: "For RHE, the browser obtains the SOL entry, HTTP reaches the draft, the legal confirmation stays supervised, and XML/PDF download is wired for validation on the next real issuance. F616 keeps its headless API read path.",
+				code: '$ sunat-cli rhe emit \\\n    --params \'{"empresa":"Client","descripcion":"Service","monto":100}\' --preview-only',
 			},
 			{
 				title: "Lookups",
 				scope: "Padrón RUC, consulta CPE, tipo de cambio",
 				desc: "OAuth2 client credentials against the public REST surface. The padrón syncs incrementally so a local lookup answers in under a millisecond.",
 				code: "$ sunat-cli api consulta \\\n    --tipo 01 --serie F001 --numero 123",
+			},
+			{
+				title: "Buzón SOL",
+				scope: "Messages and notifications, metadata only",
+				desc: "Lists without opening detail, preserves contradictory counts as evidence, and detects changes with a private local snapshot.",
+				code: "$ sunat-cli buzon list",
 			},
 			{
 				title: "Secrets in the OS keychain",
@@ -396,33 +434,33 @@ const en: Content = {
 		],
 	},
 	architecture: {
-		heading: "Headless after one login",
+		heading: "Endpoints first, browser at the boundary",
 		prose: [
 			"The F616 declaration page looks like a form. It is a single-page app talking to a JSON API, and the form fields are the least reliable way to reach it.",
-			"So the CLI opens a browser once, captures the session token, and closes it. Every read after that goes straight to the API the form was calling. No CAPTCHA, no DOM to fight, no browser process left running.",
+			"RHE is different: Menu SOL mints an ephemeral entry and the backend returns HTML. The CLI uses HTTP for deduction, identity, and details, renders the draft again, reserves DOM automation for the legal confirmation, and wires XML/PDF through endpoints after issuance.",
 		],
 		steps: [
 			{
 				n: "01",
-				title: "Capture",
-				desc: "Open the browser once, log in, take the session token, close it.",
+				title: "Bootstrap",
+				desc: "Open SOL and obtain the entry or token required by the official surface.",
 			},
 			{
 				n: "02",
-				title: "Read headless",
-				desc: "Query the declaration API directly with the cached token, with no browser running.",
+				title: "Direct HTTP",
+				desc: "Call the API or form session and validate the server's real response.",
 			},
 			{
 				n: "03",
-				title: "Recapture on expiry",
-				desc: "When the token ages out, capture again. Everything between those two moments stays headless.",
+				title: "Confirm",
+				desc: "For RHE, keep the legal action under human control, then validate and save artifacts only when SUNAT returns real XML/PDF bytes.",
 			},
 		],
 	},
 	coverage: {
 		heading: "How far each surface goes",
 		shipped: (n, total) => `${n} of ${total} shipped and verified`,
-		note: "Percentages are a judgement about how much of each surface is wrapped, validated against the beta endpoint, and callable by an agent. The last row is the one that matters most and it is the lowest: nothing here has been run against production credentials.",
+		note: "Percentages are a judgement about how much of each surface is wrapped and callable by an agent. The Buzón SOL metadata reader was verified with an own production account. Tax submissions remain beta.",
 		th: { surface: "Surface", wrapped: "Wrapped", pct: "%", state: "State" },
 		caption: "Coverage by SUNAT surface, with completeness and state",
 		states: {
@@ -440,9 +478,15 @@ const en: Content = {
 			},
 			{
 				domain: "RHE and F616",
-				detail: "Personas naturales",
-				pct: 95,
-				state: "shipped",
+				detail: "Supervised RHE; XML/PDF wired, live pending",
+				pct: 85,
+				state: "partial",
+			},
+			{
+				domain: "Buzón SOL",
+				detail: "Metadata, snapshot and changes",
+				pct: 45,
+				state: "partial",
 			},
 			{
 				domain: "Invoices",
@@ -533,7 +577,7 @@ const en: Content = {
 			},
 			{
 				rule: "Every mutation previews first",
-				why: "--dry-run returns the same shape as the real call, with a hash, so a caller can diff before committing.",
+				why: "For RHE, --dry-run validates locally and --preview-only reconciles SUNAT's real draft before issuance is enabled.",
 			},
 			{
 				rule: "JSON when stdout is not a terminal",
@@ -589,7 +633,7 @@ export type LegalContent = {
 
 const legalEs: LegalContent = {
 	title: "Marco legal",
-	updated: "Última actualización: 25 de marzo de 2026",
+	updated: "Última actualización: 26 de agosto de 2026",
 	sections: [
 		{
 			heading: "Sobre esta herramienta",
@@ -606,7 +650,7 @@ const legalEs: LegalContent = {
 				"La exactitud de las declaraciones tributarias enviadas con esta herramienta",
 				"El cumplimiento de los plazos y obligaciones tributarias ante SUNAT",
 				"El resguardo de su clave SOL",
-				"Revisar toda operación con --dry-run antes de ejecutarla",
+				"Revisar toda operación con --dry-run y, para RHE, con --preview-only antes de emitir",
 			],
 		},
 		{
@@ -640,7 +684,7 @@ const legalEs: LegalContent = {
 				"El portal de Operaciones en Línea de SUNAT no prohíbe explícitamente el acceso automatizado por parte de usuarios autenticados. Sin embargo:",
 			],
 			list: [
-				"Esta herramienta usa Chrome con interfaz visible, no headless, para no chocar con la detección de bots de SUNAT",
+				"Esta herramienta usa Chrome visible cuando SUNAT exige autenticación o confirmación interactiva y HTTP directo para los tramos verificados",
 				"Las operaciones incluyen demoras realistas entre envíos de formularios",
 				"No se intenta eludir ningún límite de tasa",
 				"La herramienta respeta el vencimiento de sesión y se reautentica correctamente",
@@ -670,7 +714,7 @@ const legalEs: LegalContent = {
 
 const legalEn: LegalContent = {
 	title: "Legal framework",
-	updated: "Last updated: March 25, 2026",
+	updated: "Last updated: August 26, 2026",
 	sections: [
 		{
 			heading: "About this tool",
@@ -687,7 +731,7 @@ const legalEn: LegalContent = {
 				"The accuracy of tax declarations submitted through this tool",
 				"Compliance with SUNAT deadlines and tax obligations",
 				"Safeguarding your Clave SOL credentials",
-				"Reviewing all operations via --dry-run before execution",
+				"Reviewing every operation via --dry-run and RHE issuance via --preview-only before submitting",
 			],
 		},
 		{
@@ -721,7 +765,7 @@ const legalEn: LegalContent = {
 				"SUNAT's Operaciones en Linea portal does not explicitly prohibit automated access by authenticated users. However:",
 			],
 			list: [
-				"This tool uses headed Chrome (not headless) to comply with SUNAT's bot detection",
+				"This tool uses headed Chrome when SUNAT requires interactive authentication or confirmation, and direct HTTP for verified intermediate stages",
 				"Operations include realistic delays between form submissions",
 				"No rate-limiting circumvention is attempted",
 				"The tool respects session timeouts and re-authenticates properly",

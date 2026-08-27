@@ -18,18 +18,39 @@ npm install -g @crafter/sunat-cli
 
 ## Usage
 
-Two namespaces, by RUC type:
+Selected surfaces:
 
 ### Personas naturales (RUC 10) — RHE + F616
 
 ```bash
 sunat-cli login                          # Auth (no CAPTCHA)
 sunat-cli schema rhe                     # Introspect fields
-sunat-cli rhe emit --dry-run --json '{}' # Preview
-sunat-cli rhe emit --batch ./data.csv    # Batch emit
-sunat-cli f616 declare --dry-run --json '{"periodo":"2025-03"}'
+sunat-cli rhe emit --params '{"empresa":"Cliente","descripcion":"Servicio","monto":100}' --dry-run
+sunat-cli rhe emit --params '{"empresa":"Cliente","descripcion":"Servicio","monto":100}' --preview-only
+sunat-cli rhe emit --params '{"empresa":"Cliente","descripcion":"Servicio","monto":100}' --yes --live-sunat
+sunat-cli rhe emit --params '{"empresa":"Cliente","descripcion":"Servicio","monto":100}' --yes --live-sunat --artifacts-dir /absolute/path/rhe
+sunat-cli f616 declare --dry-run --params '{"periodo":"2025-03"}'
 sunat-cli api token --output json        # Validate OAuth2 credentials without printing the token
 ```
+
+RHE is hybrid: a headed SOL session mints the entry URL, direct HTTP reaches the
+legally invalid preview, and the final browser confirmation remains gated. Once
+issued, the same session downloads and validates the XML and PDF. The JSON result
+contains their private local paths and reports artifact errors separately from
+the legal issuance status.
+
+### Buzón SOL metadata (read-only)
+
+```bash
+sunat-cli login
+sunat-cli buzon list --max-pages 25
+sunat-cli buzon status
+sunat-cli schema buzon
+```
+
+`buzon list` reads message and notification metadata through the local SOL browser session. The detail endpoint is blocked before the visor loads, so bodies and read-state mutations cannot reach SUNAT. It stores a private `~/.sunat/buzon/state.json` snapshot to detect new identities on the next run. `buzon status` reads that snapshot offline.
+
+The first run establishes a baseline. No item is marked new until a later run sees an identity absent from the prior snapshot. Reported totals are preserved separately from observed rows because the legacy visor can contradict itself.
 
 ### SIRE — Registro de Ventas (RVIE) y Compras (RCE)
 

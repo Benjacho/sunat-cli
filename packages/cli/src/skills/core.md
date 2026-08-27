@@ -4,7 +4,8 @@ SUNAT tax automation via `npx @crafter/sunat-cli` (or `sunat-cli` if globally in
 
 Install: `npm install -g @crafter/sunat-cli`. Runs on Node, no Bun needed.
 
-RHE, F616 and the portal scrapers drive a real browser through
+RHE uses a real browser for SOL bootstrap and final confirmation, with direct
+HTTP form transitions through the server preview. F616 and portal scrapers use
 [agent-browser](https://github.com/vercel-labs/agent-browser), which is a
 separate binary rather than a bundled dependency:
 
@@ -40,45 +41,51 @@ sunat-cli whoami
 ```
 
 RUC and usuario are saved to `~/.sunat/config.json` after first login. Password is never stored in config or another plaintext file; optional persistence uses the OS keychain.
+For non-interactive setup, pipe the secret with `sunat-cli keychain set SUNAT_PASSWORD --stdin`; it is still stored only in the OS keychain.
 
 ### RHE (Recibo por Honorarios)
 
 ```bash
-# Emit single RHE
+# Build and reconcile one RHE draft in SUNAT
 sunat-cli rhe emit --params '{
   "empresa": "Cliente Ejemplo",
   "tipoDoc": "SIN DOCUMENTO",
   "descripcion": "Servicios de desarrollo de software",
   "monto": 6700,
-  "moneda": "USD",
+  "moneda": "PEN",
   "medioPago": "TRANSFERENCIA"
-}'
+}' --preview-only
 
-# Preview without submitting
+# Validate locally without opening SUNAT
 sunat-cli rhe emit --params '...' --dry-run
 
-# Batch from CSV
-sunat-cli rhe emit --batch recibos.csv
+# Reach SUNAT's server preview by direct HTTP and render it for review
+sunat-cli rhe emit --params '...' --preview-only
 
-# List issued RHEs
-sunat-cli rhe list
+# Emit only after visually checking the preview; XML and PDF go to Downloads/sunat-rhe
+sunat-cli rhe emit --params '...' --yes --live-sunat
 
-# Verify registration
-sunat-cli rhe verify --month 2026-03
+# Choose another private artifact directory
+sunat-cli rhe emit --params '...' --yes --live-sunat --artifacts-dir /absolute/path/rhe
+
+# Validate a CSV batch locally
+sunat-cli rhe emit --batch recibos.csv --dry-run
 ```
 
 **RHE fields**: `sunat-cli skills get schemas` for the full field specs.
 
 Key rules:
-- `tipoDoc`: Use `SIN DOCUMENTO` for foreign companies (no RUC/DNI)
-- `moneda`: USD requires explicit `tipoCambio` in beta
+- `tipoDoc`: Only `SIN DOCUMENTO` is verified. RUC/DNI have an additional validation transition that still needs an authorized capture.
+- `moneda`: The captured HAR used PEN. Always reconcile USD with `--preview-only` before live use.
 - `fechaEmision`: the portal refuses anything older than 2 days. Measured, not
   documented by SUNAT: no published resolution sets that limit, but the form
   enforces it with an alert that closes on its own (invisible to snapshots; the
   visible symptom is that the form simply does not advance).
-- `fechaEmision` **is accepted but never written to the form** by `rhe emit`, and
-  still comes back in the result as if it had been. Check before trusting a batch.
-- Auth: SOL viejo portal through headed browser automation. Captcha/session behavior can change, so keep it supervised.
+- `fechaEmision` is sent as `fecemi` in DD/MM/YYYY and reconciled against the rendered server preview.
+- The observed flow is `CONTADO`, non-gratuito, inciso A, no withholding and fully paid at emission.
+- Auth: headed SOL bootstrap; deduction, identity and details go by direct HTTP; final confirmation remains supervised in the browser.
+- After confirmation, the CLI posts `descargarreciboxml1` and `descargarrecibopdf1` through the same form session, validates both files and returns their private local paths. Artifact failure is reported separately from issuance status.
+- Live batches are disabled. Validate CSV with `--dry-run`, then preview and emit each RHE individually.
 
 ### F616 (Monthly Tax Declaration)
 
@@ -130,12 +137,37 @@ Key rules, each one learned by hitting it:
 this. Its `ingresoPEN` and `retenciones` fields are declared in the schema and
 then ignored by the code. Prefer `declarar`.
 
+### Buzón SOL metadata
+
+```bash
+sunat-cli login
+sunat-cli buzon list --max-pages 25
+sunat-cli buzon status
+sunat-cli schema buzon
+```
+
+`buzon list` opens the legacy visor in the local SOL session, blocks the detail
+endpoint before navigation, and reads folders, alerts, messages and notification
+metadata. It does not open bodies or download attachments. Requests are
+serialized with a 1.2 second floor and a maximum of 25 pages per inbox by
+default.
+
+The command saves `~/.sunat/buzon/state.json` with owner-only permissions. The
+first run is a baseline. Later runs mark identities absent from the previous
+snapshot as new. `buzon status` reads the last snapshot without contacting
+SUNAT.
+
+SUNAT's `total`, `records` and returned rows can disagree. The JSON contract
+keeps all three observations and sets `countMismatch` instead of choosing one.
+`validUntilObserved` is upstream metadata, not a legal deadline.
+
 ### API & Schema
 
 ```bash
 sunat-cli api token              # Validate OAuth2 credentials without printing the token
 sunat-cli schema rhe             # JSON schema for RHE fields
 sunat-cli schema f616            # JSON schema for F616 fields
+sunat-cli schema buzon           # Metadata-only Buzón SOL contract
 ```
 
 Use `sunat-cli schema <resource>` to get machine-readable field definitions before constructing payloads.
@@ -180,8 +212,8 @@ form between periods**. Eight periods spanning nine months were filed this way o
 
 **Emit an RHE**:
 1. `sunat-cli login`
-2. `sunat-cli rhe emit --params '{"empresa":"Cliente Ejemplo","tipoDoc":"SIN DOCUMENTO","descripcion":"Servicios de desarrollo de software - Marzo 2026","monto":6700,"moneda":"USD","medioPago":"TRANSFERENCIA","tipoCambio":3.75}' --dry-run`
-3. `sunat-cli rhe verify --month 2026-03`
+2. `sunat-cli rhe emit --params '{"empresa":"Cliente Ejemplo","tipoDoc":"SIN DOCUMENTO","descripcion":"Servicios de desarrollo de software - Agosto 2026","monto":6700,"moneda":"PEN","medioPago":"TRANSFERENCIA"}' --preview-only`
+3. Check the headed browser, then rerun with `--yes --live-sunat`; the result includes the XML and PDF paths
 
 ## Error Handling
 

@@ -1,9 +1,9 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
-import { join } from "path";
 import { tmpdir } from "os";
-import { loadCachedTc, saveTc, selectRateForDate } from "../../src/sunat-rest/tipo-cambio.ts";
+import { join } from "path";
 import { paths } from "../../src/data/config.ts";
+import { getTipoCambio, loadCachedTc, saveTc, selectRateForDate } from "../../src/sunat-rest/tipo-cambio.ts";
 
 const CACHE_FILE = join(paths.sunatDir, "cache", "tipo-cambio.jsonl");
 const TEST_TAG_DATE = "2099-01-01"; // collision-proof — never a real TC date
@@ -77,6 +77,26 @@ describe("selectRateForDate — pure selector", () => {
 			row("02/12/2025", "3.510", "V"),
 		];
 		expect(selectRateForDate(rows, "2025-12-05")?.publicada).toBe("2025-12-02");
+	});
+});
+
+describe("getTipoCambio — request shape", () => {
+	test("sends Accept-Encoding, which the WAF requires", async () => {
+		const original = global.fetch;
+		let seen: Record<string, string> = {};
+		global.fetch = (async (_url: unknown, init?: RequestInit) => {
+			seen = Object.fromEntries(new Headers(init?.headers).entries());
+			return new Response(JSON.stringify([row("01/01/2099", "3.500", "C"), row("01/01/2099", "3.510", "V")]), {
+				status: 200,
+			});
+		}) as typeof fetch;
+		try {
+			const rate = await getTipoCambio({ fecha: TEST_TAG_DATE, force: true });
+			expect(rate.venta).toBe(3.51);
+			expect(seen["accept-encoding"]).toContain("gzip");
+		} finally {
+			global.fetch = original;
+		}
 	});
 });
 

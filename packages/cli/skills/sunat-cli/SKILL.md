@@ -1,6 +1,6 @@
 ---
 name: sunat-cli
-description: SUNAT tax automation CLI for Peru. Three namespaces. (A) Personas naturales (RUC 10): emit Recibos por Honorarios (RHE), file F616 monthly declarations. (B) Empresas (RUC 20): emit Comprobantes de Pago Electronicos (CPE) — Factura, Boleta, NC, ND, Guia — under `sunat-cli cpe ...`. Use when: (1) user mentions SUNAT, RHE, recibo por honorarios, F616, impuestos Peru, (2) user wants to emit an invoice (factura/boleta) or recibo, (3) user asks about CPE, UBL 2.1, XAdES, OSE, PSE, Facturador SUNAT, (4) user says "emitir recibo", "emitir factura", "declarar F616", "anular comprobante". (C) Renta Anual (F709) read-only: consult the annual income-tax return, its casillas, filings and constancias under `sunat-cli renta ...` — use when the user mentions renta anual, declaracion jurada anual, F709, or DJ anual. Package: @crafter/sunat-cli (npm).
+description: SUNAT tax automation CLI for Peru. Personas naturales (RUC 10), empresas (RUC 20), Renta Anual F709, SIRE and a read-only Buzón SOL metadata reader. Use when the user mentions SUNAT, Buzón SOL, RHE, F616, renta anual, F709, CPE, SIRE, invoices or Peruvian taxes. Package: @crafter/sunat-cli (npm).
 ---
 
 # sunat-cli
@@ -43,36 +43,41 @@ Linux stores secrets through `secret-tool` / libsecret.
 ### RHE (Recibo por Honorarios)
 
 ```bash
-# Emit single RHE
+# Build and reconcile one RHE draft in SUNAT
 sunat-cli rhe emit --params '{
   "empresa": "Cliente Ejemplo",
   "tipoDoc": "SIN DOCUMENTO",
   "descripcion": "Servicios de desarrollo de software",
   "monto": 6700,
-  "moneda": "USD",
+  "moneda": "PEN",
   "medioPago": "TRANSFERENCIA"
-}'
+}' --preview-only
 
-# Preview without submitting
+# Validate locally without opening SUNAT
 sunat-cli rhe emit --params '...' --dry-run
 
-# Batch from CSV
-sunat-cli rhe emit --batch recibos.csv
+# Reach SUNAT's server preview by direct HTTP and render it for review
+sunat-cli rhe emit --params '...' --preview-only
 
-# List issued RHEs
-sunat-cli rhe list
+# Emit only after visually checking the preview; XML and PDF go to Downloads/sunat-rhe
+sunat-cli rhe emit --params '...' --yes --live-sunat
 
-# Verify registration
-sunat-cli rhe verify --month 2026-03
+# Choose another private artifact directory
+sunat-cli rhe emit --params '...' --yes --live-sunat --artifacts-dir /absolute/path/rhe
+
+# Validate a CSV batch locally
+sunat-cli rhe emit --batch recibos.csv --dry-run
 ```
 
 **RHE fields**: See `references/schemas.md` for full field specs.
 
 Key rules:
-- `tipoDoc`: Use `SIN DOCUMENTO` for foreign companies (no RUC/DNI)
-- `moneda`: USD auto-converts to PEN at SUNAT exchange rate
-- `fechaEmision`: Max 2-3 days retroactive
-- Auth: SOL viejo portal, no captcha
+- `tipoDoc`: Only `SIN DOCUMENTO` is verified. RUC/DNI need a separate authorized capture.
+- `fechaEmision`: Sent as DD/MM/YYYY and reconciled against the rendered preview. The observed portal accepts today or the previous 2 days.
+- The observed path is `CONTADO`, non-gratuito, inciso A, no withholding and fully paid at emission.
+- Auth: headed SOL bootstrap; direct HTTP through preview; browser confirmation for the final legal submission.
+- After confirmation, the same session downloads and validates the XML and PDF. JSON output returns private local paths and reports artifact failures separately from issuance status.
+- Live batches are disabled. Validate CSV with `--dry-run`, then preview and emit each RHE individually.
 
 ### F616 (Monthly Tax Declaration)
 
@@ -398,12 +403,38 @@ scan regardless of N RUCs.
 sunat-cli api token              # Validate OAuth2 credentials without printing the token
 sunat-cli schema rhe             # JSON schema for RHE fields
 sunat-cli schema f616            # JSON schema for F616 fields
+sunat-cli schema buzon           # Metadata-only Buzón SOL contract
 sunat-cli schema cpe-factura     # JSON schema for Factura Electronica
 sunat-cli schema cpe-boleta      # JSON schema for Boleta de Venta
 sunat-cli schema cpe-nota-credito
 ```
 
 Use `sunat-cli schema <resource>` to get machine-readable field definitions before constructing payloads.
+
+## Buzón SOL metadata
+
+```bash
+sunat-cli login
+sunat-cli buzon list --max-pages 25
+sunat-cli buzon status
+sunat-cli schema buzon
+```
+
+`buzon list` reads messages and notifications from the local SOL browser
+session. The detail endpoint is blocked before the visor loads, so bodies,
+attachments and read-state mutations cannot reach SUNAT. Requests are serialized
+and pagination is bounded.
+
+The first run creates a private baseline at `~/.sunat/buzon/state.json`. Later
+runs set `newSincePrevious` only for identities absent from the prior snapshot.
+`buzon status` reads the snapshot offline.
+
+Treat `reportedTotalsObserved`, `reportedRecordsObserved` and `observedCount` as
+separate evidence. The legacy visor can return contradictory values.
+
+`validUntilObserved` is an upstream value, not a legal deadline. The namespace
+does not classify acts, recommend tax actions, poll in the background or support
+multiple RUCs.
 
 ## Renta Anual — F709 (Persona Natural)
 
@@ -524,8 +555,8 @@ not as an error.
 
 **Emit an RHE**:
 1. `sunat-cli login`
-2. `sunat-cli rhe emit --params '{"empresa":"Cliente Ejemplo","tipoDoc":"SIN DOCUMENTO","descripcion":"Servicios de desarrollo de software - Marzo 2026","monto":6700,"moneda":"USD","medioPago":"TRANSFERENCIA"}'`
-3. `sunat-cli rhe verify --month 2026-03`
+2. `sunat-cli rhe emit --params '{"empresa":"Cliente Ejemplo","tipoDoc":"SIN DOCUMENTO","descripcion":"Servicios de desarrollo de software - Agosto 2026","monto":6700,"moneda":"PEN","medioPago":"TRANSFERENCIA"}' --preview-only`
+3. Check the headed browser, then rerun with `--yes --live-sunat`
 
 ## Error Handling
 
