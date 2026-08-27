@@ -50,6 +50,7 @@
 		"smoke:sunat": "bash scripts/smoke-sunat.sh",
 		"smoke:boleta": "bash scripts/smoke-boleta.sh",
 		"smoke:padron": "bash scripts/smoke-padron.sh",
+		"smoke:sire-propuesta": "bash scripts/smoke-sire-propuesta.sh",
 		"smoke:tipo-cambio": "bash scripts/smoke-tipo-cambio.sh"
 	},
 	"dependencies": {

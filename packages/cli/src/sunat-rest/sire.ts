@@ -104,19 +104,15 @@ export interface TicketResponse {
 }
 
 export async function descargarPropuesta(opts: DescargarOpts, creds: OAuthCredentials): Promise<string> {
-	const path =
-		opts.codLibro === COD_LIBRO.rvie
-			? `/contribuyente/migeigv/libros/rvierce/gestionprocesosmasivos/web/masivo/exportapropuesta`
-			: `/contribuyente/migeigv/libros/rce/propuesta/web/propuesta/${opts.perTributario}/exportacioncomprobantepropuesta`;
-
+	const libro = opts.codLibro === COD_LIBRO.rvie ? "rvie" : "rce";
+	const action = opts.codLibro === COD_LIBRO.rvie ? "exportapropuesta" : "exportacioncomprobantepropuesta";
 	const r = await callRestApi<TicketResponse>({
 		creds,
 		baseHost: "sire",
 		method: "GET",
-		path,
+		path: `/contribuyente/migeigv/libros/${libro}/propuesta/web/propuesta/${opts.perTributario}/${action}`,
 		query: {
-			perTributario: opts.perTributario,
-			codTipoArchivoReporte: opts.codTipoArchivo || "0",
+			codTipoArchivo: opts.codTipoArchivo || "0",
 			codOrigenEnvio: opts.codOrigenEnvio || "2",
 		},
 	});
@@ -142,16 +138,30 @@ export async function descargarRvie(perTributario: string, creds: OAuthCredentia
 // 5.16 Consultar estado del ticket
 // ---------------------------------------------------------------------------
 
+export interface TicketArchivo {
+	nomArchivoReporte: string;
+	codTipoAchivoReporte?: string;
+	codTipoArchivoReporte?: string;
+	nomArchivoContenido?: string;
+}
+
 export interface TicketStatus {
 	numTicket: string;
 	codEstadoProceso: string; // "01" iniciado, "03" en proceso, "06" terminado, "07" error, "10" terminado con error
 	desEstadoProceso: string;
+	codProceso?: string;
+	desProceso?: string;
+	perTributario?: string;
 	codTipoArchivoReporte?: string;
 	desTipoArchivoReporte?: string;
-	archivoReporte?: { nomArchivoReporte: string; codTipoArchivoReporte?: string }[];
+	archivoReporte?: TicketArchivo[];
 }
 
-export async function consultarTicket(numTicket: string, creds: OAuthCredentials): Promise<TicketStatus> {
+export async function consultarTicket(
+	numTicket: string,
+	creds: OAuthCredentials,
+	perTributario: string,
+): Promise<TicketStatus> {
 	const path = `/contribuyente/migeigv/libros/rvierce/gestionprocesosmasivos/web/masivo/consultaestadotickets`;
 	type ApiResponse = { registros?: TicketStatus[] };
 	const r = await callRestApi<ApiResponse>({
@@ -159,13 +169,13 @@ export async function consultarTicket(numTicket: string, creds: OAuthCredentials
 		baseHost: "sire",
 		method: "GET",
 		path,
-		query: { numTicket, page: 1, perPage: 1 },
+		query: { perIni: perTributario, perFin: perTributario, numTicket, page: 1, perPage: 50 },
 	});
-	const first = r.registros?.[0];
-	if (!first) {
+	const match = r.registros?.find((t) => t.numTicket === numTicket);
+	if (!match) {
 		return { numTicket, codEstadoProceso: "00", desEstadoProceso: "No encontrado" };
 	}
-	return first;
+	return match;
 }
 
 // ---------------------------------------------------------------------------
@@ -177,11 +187,12 @@ export interface DescargarArchivoOpts {
 	codTipoArchivoReporte: string;
 	codLibro: CodLibro;
 	perTributario: string;
-	codProceso?: string; // tipo de proceso, depende del archivo origen
+	codProceso: string;
+	numTicket: string;
 }
 
 export async function descargarArchivo(opts: DescargarArchivoOpts, creds: OAuthCredentials): Promise<Buffer> {
-	const token = await import("./oauth.ts").then((m) => m.getAccessToken(creds));
+	const token = await getAccessToken(creds);
 	const url = new URL(
 		`https://api-sire.sunat.gob.pe/v1/contribuyente/migeigv/libros/rvierce/gestionprocesosmasivos/web/masivo/archivoreporte`,
 	);
@@ -189,7 +200,8 @@ export async function descargarArchivo(opts: DescargarArchivoOpts, creds: OAuthC
 	url.searchParams.set("codTipoArchivoReporte", opts.codTipoArchivoReporte);
 	url.searchParams.set("codLibro", opts.codLibro);
 	url.searchParams.set("perTributario", opts.perTributario);
-	if (opts.codProceso) url.searchParams.set("codProceso", opts.codProceso);
+	url.searchParams.set("codProceso", opts.codProceso);
+	url.searchParams.set("numTicket", opts.numTicket);
 
 	const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 	if (!resp.ok) {
@@ -197,6 +209,24 @@ export async function descargarArchivo(opts: DescargarArchivoOpts, creds: OAuthC
 	}
 	const ab = await resp.arrayBuffer();
 	return Buffer.from(ab);
+}
+
+export function archivoDeTicket(
+	ticket: { numTicket: string; codProceso?: string; archivoReporte?: TicketArchivo[] },
+	codLibro: CodLibro,
+	perTributario: string,
+	index = 0,
+): DescargarArchivoOpts | null {
+	const a = ticket.archivoReporte?.[index];
+	if (!a || !ticket.codProceso) return null;
+	return {
+		nomArchivoReporte: a.nomArchivoReporte,
+		codTipoArchivoReporte: a.codTipoAchivoReporte ?? a.codTipoArchivoReporte ?? "00",
+		codLibro,
+		perTributario,
+		codProceso: ticket.codProceso,
+		numTicket: ticket.numTicket,
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -231,12 +261,15 @@ export interface PollTicketResult {
 	state: TicketTerminalState;
 	statusCode: string;
 	statusDesc: string;
-	archivoReporte?: { nomArchivoReporte: string; codTipoArchivoReporte?: string }[];
+	numTicket: string;
+	codProceso?: string;
+	archivoReporte?: TicketArchivo[];
 }
 
 export interface PollTicketOpts {
 	creds: OAuthCredentials;
 	numTicket: string;
+	perTributario: string;
 	timeoutMs?: number;
 	initialDelayMs?: number;
 	maxDelayMs?: number;
@@ -251,7 +284,7 @@ export async function pollTicket(opts: PollTicketOpts): Promise<PollTicketResult
 	let attempt = 0;
 	while (Date.now() - start < timeoutMs) {
 		attempt += 1;
-		const status = await consultarTicket(opts.numTicket, opts.creds);
+		const status = await consultarTicket(opts.numTicket, opts.creds, opts.perTributario);
 		opts.onTick?.(attempt, status.desEstadoProceso);
 		// 06 = Terminado, 07/10 = error/terminado con error
 		if (status.codEstadoProceso === "06") {
@@ -259,6 +292,8 @@ export async function pollTicket(opts: PollTicketOpts): Promise<PollTicketResult
 				state: "completed",
 				statusCode: status.codEstadoProceso,
 				statusDesc: status.desEstadoProceso,
+				numTicket: status.numTicket,
+				codProceso: status.codProceso,
 				archivoReporte: status.archivoReporte,
 			};
 		}
@@ -267,6 +302,8 @@ export async function pollTicket(opts: PollTicketOpts): Promise<PollTicketResult
 				state: "error",
 				statusCode: status.codEstadoProceso,
 				statusDesc: status.desEstadoProceso,
+				numTicket: status.numTicket,
+				codProceso: status.codProceso,
 			};
 		}
 		await sleep(delay);
@@ -276,6 +313,7 @@ export async function pollTicket(opts: PollTicketOpts): Promise<PollTicketResult
 		state: "still-processing",
 		statusCode: "98",
 		statusDesc: `Timeout after ${Math.round((Date.now() - start) / 1000)}s`,
+		numTicket: opts.numTicket,
 	};
 }
 

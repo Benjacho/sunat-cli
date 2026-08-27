@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import {
 	COD_LIBRO,
 	aceptarPropuestaRvie,
+	archivoDeTicket,
 	consultarTicket,
+	descargarArchivo,
 	descargarPropuesta,
 	descargarRvie,
 	listarPeriodos,
@@ -91,7 +93,7 @@ describe("listarPeriodos", () => {
 });
 
 describe("descargarPropuesta", () => {
-	test("RVIE uses gestionprocesosmasivos endpoint and returns ticket", async () => {
+	test("RVIE exports from /rvie/propuesta/.../{periodo}/exportapropuesta and returns ticket", async () => {
 		let seenUrl = "";
 		mockFetch(async (url) => {
 			if (url.includes("token")) return new Response(JSON.stringify({ access_token: "tk", expires_in: 3600 }), { status: 200 });
@@ -100,13 +102,13 @@ describe("descargarPropuesta", () => {
 		});
 		const ticket = await descargarPropuesta({ codLibro: COD_LIBRO.rvie, perTributario: "202404" }, creds);
 		expect(ticket).toBe("20240100000001");
-		expect(seenUrl).toContain("exportapropuesta");
-		expect(seenUrl).toContain("perTributario=202404");
-		expect(seenUrl).toContain("codTipoArchivoReporte=0");
-		expect(seenUrl).toContain("codOrigenEnvio=2");
+		expect(seenUrl).toContain("/rvie/propuesta/web/propuesta/202404/exportapropuesta");
+		expect(seenUrl).not.toContain("gestionprocesosmasivos");
+		expect(seenUrl).toContain("codTipoArchivo=0");
+		expect(seenUrl).not.toContain("codTipoArchivoReporte");
 	});
 
-	test("RCE uses /rce/propuesta/.../exportacioncomprobantepropuesta path", async () => {
+	test("RCE exports from /rce/propuesta/.../{periodo}/exportacioncomprobantepropuesta with codOrigenEnvio", async () => {
 		let seenUrl = "";
 		mockFetch(async (url) => {
 			if (url.includes("token")) return new Response(JSON.stringify({ access_token: "tk", expires_in: 3600 }), { status: 200 });
@@ -115,6 +117,8 @@ describe("descargarPropuesta", () => {
 		});
 		await descargarPropuesta({ codLibro: COD_LIBRO.rce, perTributario: "202404" }, creds);
 		expect(seenUrl).toContain("/rce/propuesta/web/propuesta/202404/exportacioncomprobantepropuesta");
+		expect(seenUrl).toContain("codTipoArchivo=0");
+		expect(seenUrl).toContain("codOrigenEnvio=2");
 	});
 });
 
@@ -151,24 +155,71 @@ describe("aceptarPropuestaRvie", () => {
 });
 
 describe("consultarTicket", () => {
-	test("returns first registro from response", async () => {
+	test("queries the period window and returns the matching registro", async () => {
+		let seenUrl = "";
 		mockFetch(async (url) => {
 			if (url.includes("token")) return new Response(JSON.stringify({ access_token: "tk", expires_in: 3600 }), { status: 200 });
-			return new Response(JSON.stringify({ registros: [{ numTicket: "T1", codEstadoProceso: "06", desEstadoProceso: "Terminado", archivoReporte: [{ nomArchivoReporte: "out.zip", codTipoArchivoReporte: "0" }] }] }), { status: 200 });
+			seenUrl = url;
+			return new Response(JSON.stringify({ registros: [
+				{ numTicket: "T0", codEstadoProceso: "06", desEstadoProceso: "Terminado" },
+				{ numTicket: "T1", codEstadoProceso: "06", desEstadoProceso: "Terminado", codProceso: "10", archivoReporte: [{ nomArchivoReporte: "out.zip", codTipoAchivoReporte: "00" }] },
+			] }), { status: 200 });
 		});
-		const status = await consultarTicket("T1", creds);
-		expect(status.codEstadoProceso).toBe("06");
+		const status = await consultarTicket("T1", creds, "202404");
+		expect(seenUrl).toContain("perIni=202404");
+		expect(seenUrl).toContain("perFin=202404");
+		expect(seenUrl).toContain("numTicket=T1");
+		expect(status.numTicket).toBe("T1");
+		expect(status.codProceso).toBe("10");
 		expect(status.archivoReporte?.[0].nomArchivoReporte).toBe("out.zip");
 	});
 
-	test("returns 'No encontrado' when registros is empty", async () => {
+	test("returns 'No encontrado' when the ticket is not in the period's listing", async () => {
 		mockFetch(async (url) => {
 			if (url.includes("token")) return new Response(JSON.stringify({ access_token: "tk", expires_in: 3600 }), { status: 200 });
-			return new Response(JSON.stringify({ registros: [] }), { status: 200 });
+			return new Response(JSON.stringify({ registros: [{ numTicket: "other", codEstadoProceso: "06", desEstadoProceso: "Terminado" }] }), { status: 200 });
 		});
-		const status = await consultarTicket("Tx", creds);
+		const status = await consultarTicket("Tx", creds, "202404");
 		expect(status.codEstadoProceso).toBe("00");
 		expect(status.desEstadoProceso).toContain("No encontrado");
+	});
+});
+
+describe("descargarArchivo", () => {
+	test("sends codProceso and numTicket alongside the file name", async () => {
+		let seenUrl = "";
+		mockFetch(async (url) => {
+			if (url.includes("token")) return new Response(JSON.stringify({ access_token: "tk", expires_in: 3600 }), { status: 200 });
+			seenUrl = url;
+			return new Response(new Uint8Array([0x50, 0x4b]), { status: 200 });
+		});
+		const buf = await descargarArchivo(
+			{ nomArchivoReporte: "LE0000000000020240400080400021112.zip", codTipoArchivoReporte: "00", codLibro: COD_LIBRO.rce, perTributario: "202404", codProceso: "10", numTicket: "20240100000001" },
+			creds,
+		);
+		expect(buf.length).toBe(2);
+		expect(seenUrl).toContain("nomArchivoReporte=LE0000000000020240400080400021112.zip");
+		expect(seenUrl).toContain("codTipoArchivoReporte=00");
+		expect(seenUrl).toContain("codLibro=080000");
+		expect(seenUrl).toContain("perTributario=202404");
+		expect(seenUrl).toContain("codProceso=10");
+		expect(seenUrl).toContain("numTicket=20240100000001");
+	});
+});
+
+describe("archivoDeTicket", () => {
+	test("assembles download options from a finished ticket, reading SUNAT's misspelled type field", () => {
+		const opts = archivoDeTicket(
+			{ numTicket: "T1", codProceso: "10", archivoReporte: [{ nomArchivoReporte: "a.zip", codTipoAchivoReporte: "00" }] },
+			COD_LIBRO.rvie,
+			"202404",
+		);
+		expect(opts).toEqual({ nomArchivoReporte: "a.zip", codTipoArchivoReporte: "00", codLibro: "140000", perTributario: "202404", codProceso: "10", numTicket: "T1" });
+	});
+
+	test("returns null when the ticket lists no file or no process", () => {
+		expect(archivoDeTicket({ numTicket: "T1", codProceso: "10" }, COD_LIBRO.rvie, "202404")).toBeNull();
+		expect(archivoDeTicket({ numTicket: "T1", archivoReporte: [{ nomArchivoReporte: "a" }] }, COD_LIBRO.rvie, "202404")).toBeNull();
 	});
 });
 
@@ -178,8 +229,9 @@ describe("pollTicket", () => {
 			if (url.includes("token")) return new Response(JSON.stringify({ access_token: "tk", expires_in: 3600 }), { status: 200 });
 			return new Response(JSON.stringify({ registros: [{ numTicket: "T1", codEstadoProceso: "06", desEstadoProceso: "Terminado", archivoReporte: [{ nomArchivoReporte: "f.zip" }] }] }), { status: 200 });
 		});
-		const result = await pollTicket({ creds, numTicket: "T1", initialDelayMs: 1, maxDelayMs: 1, timeoutMs: 5000 });
+		const result = await pollTicket({ creds, numTicket: "T1", perTributario: "202404", initialDelayMs: 1, maxDelayMs: 1, timeoutMs: 5000 });
 		expect(result.state).toBe("completed");
+		expect(result.numTicket).toBe("T1");
 		expect(result.archivoReporte?.[0].nomArchivoReporte).toBe("f.zip");
 	});
 
@@ -188,7 +240,7 @@ describe("pollTicket", () => {
 			if (url.includes("token")) return new Response(JSON.stringify({ access_token: "tk", expires_in: 3600 }), { status: 200 });
 			return new Response(JSON.stringify({ registros: [{ numTicket: "T1", codEstadoProceso: "07", desEstadoProceso: "Error en proceso" }] }), { status: 200 });
 		});
-		const result = await pollTicket({ creds, numTicket: "T1", initialDelayMs: 1, maxDelayMs: 1, timeoutMs: 5000 });
+		const result = await pollTicket({ creds, numTicket: "T1", perTributario: "202404", initialDelayMs: 1, maxDelayMs: 1, timeoutMs: 5000 });
 		expect(result.state).toBe("error");
 		expect(result.statusDesc).toContain("Error");
 	});
@@ -198,7 +250,7 @@ describe("pollTicket", () => {
 			if (url.includes("token")) return new Response(JSON.stringify({ access_token: "tk", expires_in: 3600 }), { status: 200 });
 			return new Response(JSON.stringify({ registros: [{ numTicket: "T1", codEstadoProceso: "03", desEstadoProceso: "En proceso" }] }), { status: 200 });
 		});
-		const result = await pollTicket({ creds, numTicket: "T1", initialDelayMs: 1, maxDelayMs: 1, timeoutMs: 50 });
+		const result = await pollTicket({ creds, numTicket: "T1", perTributario: "202404", initialDelayMs: 1, maxDelayMs: 1, timeoutMs: 50 });
 		expect(result.state).toBe("still-processing");
 	});
 });
