@@ -93,10 +93,6 @@ describe("listarPeriodos", () => {
 });
 
 describe("descargarPropuesta", () => {
-	// Manual API Registro de Ventas v30 §5.18: the export lives in the book's
-	// propuesta module with the period in the path, and the format parameter is
-	// codTipoArchivo. The v22 route under gestionprocesosmasivos is answered by
-	// the gateway with a bare nginx 500, like any route that does not exist.
 	test("RVIE exports from /rvie/propuesta/.../{periodo}/exportapropuesta and returns ticket", async () => {
 		let seenUrl = "";
 		mockFetch(async (url) => {
@@ -112,8 +108,6 @@ describe("descargarPropuesta", () => {
 		expect(seenUrl).not.toContain("codTipoArchivoReporte");
 	});
 
-	// Manual SIRE Compras v28 §5.34. SUNAT answers 422 "El campo 'codOrigenEnvio'
-	// es nulo o vacio" when the origin is missing.
 	test("RCE exports from /rce/propuesta/.../{periodo}/exportacioncomprobantepropuesta with codOrigenEnvio", async () => {
 		let seenUrl = "";
 		mockFetch(async (url) => {
@@ -161,8 +155,6 @@ describe("aceptarPropuestaRvie", () => {
 });
 
 describe("consultarTicket", () => {
-	// Manual API Registro de Ventas v30 §5.16: consultaestadotickets lists tickets
-	// per period; perIni/perFin are mandatory and a query by numTicket alone is 422.
 	test("queries the period window and returns the matching registro", async () => {
 		let seenUrl = "";
 		mockFetch(async (url) => {
@@ -194,8 +186,6 @@ describe("consultarTicket", () => {
 });
 
 describe("descargarArchivo", () => {
-	// Manual API Registro de Ventas v30 §5.17 lists perTributario, codProceso and
-	// numTicket as mandatory; the server answers 500 without codProceso or numTicket.
 	test("sends codProceso and numTicket alongside the file name", async () => {
 		let seenUrl = "";
 		mockFetch(async (url) => {
