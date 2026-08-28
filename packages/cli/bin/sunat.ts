@@ -5,6 +5,7 @@ import { createApiCommand } from "../src/commands/api/index.ts";
 import { createAuditCommand } from "../src/commands/audit.ts";
 import { createBuzonCommand } from "../src/commands/buzon/index.ts";
 import { createCpeCommand } from "../src/commands/cpe/index.ts";
+import { createDeclaracionesCommand } from "../src/commands/declaraciones/index.ts";
 import { createDoctorCommand } from "../src/commands/doctor.ts";
 import { createF616Command } from "../src/commands/f616/index.ts";
 import { createKeychainCommand } from "../src/commands/keychain.ts";
@@ -61,6 +62,7 @@ program.addCommand(createSireCommand());
 program.addCommand(createTipoCambioCommand());
 program.addCommand(createAuditCommand());
 program.addCommand(createBuzonCommand());
+program.addCommand(createDeclaracionesCommand());
 
 if (wantsBanner(process.argv)) {
 	printBanner({ version: pkg.version, tagline: "Agent-first CLI for SUNAT tax automation" });

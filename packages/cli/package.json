@@ -51,7 +51,8 @@
 		"smoke:boleta": "bash scripts/smoke-boleta.sh",
 		"smoke:padron": "bash scripts/smoke-padron.sh",
 		"smoke:sire-propuesta": "bash scripts/smoke-sire-propuesta.sh",
-		"smoke:tipo-cambio": "bash scripts/smoke-tipo-cambio.sh"
+		"smoke:tipo-cambio": "bash scripts/smoke-tipo-cambio.sh",
+		"smoke:declaraciones": "bash scripts/smoke-declaraciones.sh"
 	},
 	"dependencies": {
 		"@clack/prompts": "^1.1.0",

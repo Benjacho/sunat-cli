@@ -52,6 +52,18 @@ sunat-cli schema buzon
 
 The first run establishes a baseline. No item is marked new until a later run sees an identity absent from the prior snapshot. Reported totals are preserved separately from observed rows because the legacy visor can contradict itself.
 
+### Declaraciones presentadas y constancias (read-only)
+
+```bash
+sunat-cli login
+sunat-cli declaraciones list --desde 01/06/2026 --hasta 27/08/2026
+sunat-cli declaraciones list --formulario 0601 --periodo 202607
+sunat-cli declaraciones constancia <numOrden> --formulario 0601 --out constancia-0601-202607.pdf
+sunat-cli schema declaraciones
+```
+
+`declaraciones list` reads SOL's "Consulta de declaraciones juradas y pagos" (menu `12.1.1.1.4`) through the local SOL browser session and lists every declaration and NPS payment presented in the range: 0621, 0601 PLAME, 0710, 1663… SUNAT caps the window at six months; the default is the last 90 days. `--formulario` and `--periodo` filter locally. `declaraciones constancia` downloads the constancia de presentación PDF for a número de orden; it is written with mode `0600`. Nothing here files, pays or amends.
+
 ### SIRE — Registro de Ventas (RVIE) y Compras (RCE)
 
 Mandatory monthly tax filing automation. Replaces the SOL portal SIRE workflow.

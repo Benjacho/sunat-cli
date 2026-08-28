@@ -124,6 +124,19 @@ Read-only metadata namespace over the legacy visor on `ww1.sunat.gob.pe`.
 - `fecVigencia` is preserved only as `validUntilObserved`. It is not interpreted as a legal deadline.
 - CI uses redacted fixtures. Live portal behavior still needs post-release dogfood because no credentials are available in GitHub Actions.
 
+## Declaraciones presentadas y constancias
+
+Read-only namespace over SOL's legacy "Consulta de declaraciones juradas y pagos" servlet on `ww1.sunat.gob.pe/cl-ti-itdeclpagcon-mepeco/cdpS01Alias` (menu code `12.1.1.1.4`).
+
+- 🔬 `declaraciones list` and `declaraciones constancia` verified live 2026-08-27 against a production RUC 20: the listing returned 0601, 0621 and 1663 rows for Jun–Aug 2026 and the constancia PDFs of a 0601 and a 0621 filing were downloaded (~45 KB each, `%PDF-`, text extractable). Also exercised through the Node build with `bun smoke:declaraciones`.
+- ⚠️ **The servlet must be entered through the SOL menu.** Its session cookie is minted by the `action=execute&code=12.1.1.1.4&s=ww1` hop; opening the servlet URL cold answers 200 with the login page and every later fetch returns an empty table. The CLI always clicks the menu leaf first.
+- ⚠️ **Six-month window.** The visor rejects wider ranges (`diferenciaMayor6meses`); the CLI validates before calling.
+- 🚧 **Only the first page of results is read.** The visor paginates via `ConsultaDeclaracion.jsp` (`tamanioPagina`, `pagina`); a small taxpayer never reaches page two, so pagination is not implemented yet.
+- 🚧 **0709/0710 constancias are not downloaded.** Annual returns are listed, but their PDF goes through `generarConstanciaNPlat` → `accion=obtener_reportPdf&num_pres&cod_for&num_ord`, a different path that was not exercised. `renta constancia` covers the 0709 case.
+- 🚧 **Boleta 1663 detail is not read.** `accion=ComprobanteCons` returned an empty body when replayed with `fetch`; the visor submits it as a full-page form. Payment rows are listed with `numOrden` and `numPresentacion` only.
+- ⚠️ SUNAT's `validar_constanciaNP` answers `<codigo>0</codigo>` while the PDF is still being rendered ("aun no se encuentra disponible"). The CLI surfaces this as `not-available`; retry later.
+- The server-side `cod_for` / `num_ord` filters of the form are sent empty; filtering is client-side because their behavior was not measured.
+
 ## Renta Anual F709 — e-renta (PR: read path)
 
 Read-only namespace over `e-renta.sunat.gob.pe`. Recon: `recon/sunat-f709-erenta-api.md`.
