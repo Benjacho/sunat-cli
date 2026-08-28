@@ -26,20 +26,21 @@ import {
 const PORTAL_SOURCE = readFileSync(new URL("../../src/declaraciones/portal.ts", import.meta.url), "utf8");
 
 // Shape of the results table as the visor rendered it on 2026-08-27 for a
-// RUC 20 (identifiers replaced). Declarations link to constanciaNP, NPS
-// boletas to comprobante, the header row has no anchor at all.
+// RUC 20. Every value below is synthetic: dates, periods, números de orden and
+// the ECM code are invented and only mimic the layout. Declarations link to
+// constanciaNP, NPS boletas to comprobante, the header row has no anchor.
 const LISTA_FIXTURE = `
 <html><body>
 <h3>Consulta de Declaraciones</h3>
 <table>
 <tr><th>Fec. Pres.</th><th>Periodo</th><th>Cod.Form.</th><th>Desc.Form.</th><th>N&deg; Orden</th><th>Detalle</th></tr>
-<tr><td>1</td><td>27/08/2026</td><td>202607</td><td>0601</td><td>PLANILLA ELECTRONICA</td><td>1000000001</td>
+<tr><td>1</td><td>10/03/2026</td><td>202602</td><td>0601</td><td>PLANILLA ELECTRONICA</td><td>1000000001</td>
 <td><a href="javascript:constanciaNP(1000000001,'0601')">Comprobante</a></td></tr>
-<tr><td>2</td><td>25/08/2026</td><td>202607</td><td>0621</td><td>PDT IGV-RENTA MENSUAL-IEV</td><td>1000000002</td>
+<tr><td>2</td><td>09/03/2026</td><td>202602</td><td>0621</td><td>PDT IGV-RENTA MENSUAL-IEV</td><td>1000000002</td>
 <td><a href="javascript:constanciaNP(1000000002,'0621')">Comprobante</a></td></tr>
-<tr><td>3</td><td>22/07/2026</td><td>202606</td><td>1663</td><td>BOLETA DE PAGO - NPS</td><td>200000001</td>
+<tr><td>3</td><td>11/02/2026</td><td>202601</td><td>1663</td><td>BOLETA DE PAGO - NPS</td><td>200000001</td>
 <td><a href="javascript:comprobante('1663',7000000001,'',200000001)">Comprobante</a></td></tr>
-<tr><td>4</td><td>24/05/2026</td><td>202513</td><td>0710</td><td>RENTA ANUAL - EMPRESAS</td><td>1160000000</td>
+<tr><td>4</td><td>02/04/2026</td><td>202513</td><td>0710</td><td>RENTA ANUAL - EMPRESAS</td><td>1160000000</td>
 <td><a href="javascript:comprobanteNSIR('X',9000000000,'0710',1160000000,'01','202513')">Comprobante</a></td></tr>
 </table>
 <form name="formPaginacion" method="post" action="ConsultaDeclaracion.jsp"><input name="tamanioPagina"><input name="pagina"></form>
@@ -50,8 +51,8 @@ describe("declaraciones parser", () => {
 		const rows = parseListaHtml(LISTA_FIXTURE);
 		expect(rows).toHaveLength(4);
 		expect(rows[0]).toEqual({
-			fechaPresentacion: "27/08/2026",
-			periodo: "202607",
+			fechaPresentacion: "10/03/2026",
+			periodo: "202602",
 			formulario: "0601",
 			descripcion: "PLANILLA ELECTRONICA",
 			numOrden: "1000000001",
@@ -59,8 +60,8 @@ describe("declaraciones parser", () => {
 		});
 		expect(rows[1].formulario).toBe("0621");
 		expect(rows[2]).toEqual({
-			fechaPresentacion: "22/07/2026",
-			periodo: "202606",
+			fechaPresentacion: "11/02/2026",
+			periodo: "202601",
 			formulario: "1663",
 			descripcion: "BOLETA DE PAGO - NPS",
 			numOrden: "200000001",
@@ -95,8 +96,8 @@ describe("declaraciones parser", () => {
 
 	test("reads the ECM code and treats 0 as not yet available", () => {
 		expect(
-			parseCodigoConstancia('<?xml version="1.0"?>\n<codigo>{7000889F-0100-C08C-9C79-0471E5473FF2}</codigo>\n'),
-		).toBe("{7000889F-0100-C08C-9C79-0471E5473FF2}");
+			parseCodigoConstancia('<?xml version="1.0"?>\n<codigo>{0A1B2C3D-0000-1111-2222-333344445555}</codigo>\n'),
+		).toBe("{0A1B2C3D-0000-1111-2222-333344445555}");
 		expect(parseCodigoConstancia("<codigo>0</codigo>")).toBeNull();
 		expect(parseCodigoConstancia("<html>login</html>")).toBeNull();
 	});

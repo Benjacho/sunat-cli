@@ -124,9 +124,10 @@ const COMPROBANTE_RE = /comprobante\(\s*'(\d{3,4})'\s*,\s*(\d+)\s*,\s*'[^']*'\s*
 
 /**
  * Rows look like:
- *   <tr><td>4</td><td>21/07/2026</td><td>202606</td><td>0601</td>
+ *   <tr><td>4</td><td>10/03/2026</td><td>202602</td><td>0601</td>
  *       <td>PLANILLA ELECTRONICA</td><td>1000000004</td>
  *       <td><a href="javascript:constanciaNP(1000000004,'0601')">Comprobante</a></td></tr>
+ * (synthetic values; the layout is the one observed live)
  * Boletas carry `comprobante('1663',<numPres>,'',<numOrden>)` instead. The
  * anchor is the source of truth for numOrden and codFor; the cells are kept
  * for the dates and labels. Header and pagination rows have no anchor and are
