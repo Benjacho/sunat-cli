@@ -1,5 +1,5 @@
 /**
- * "Consulta de declaraciones juradas y pagos" — SOL viejo, menu code 12.1.1.1.4.
+ * "Consulta de declaraciones juradas y pagos", SOL viejo, menu code 12.1.1.1.4.
  *
  * The visor lists everything the taxpayer has filed or paid in a date range:
  * monthly returns (0621), planilla (0601), annual returns (0709/0710) and the

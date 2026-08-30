@@ -1,6 +1,6 @@
-import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Command } from "commander";
+import { writePrivateOutputFile } from "../../data/private-storage.ts";
 import {
 	DeclaracionesInputError,
 	formatFechaSunat,
@@ -13,6 +13,10 @@ import { DeclaracionesPortalError, openDeclaracionesPortal } from "../../declara
 import type { ConstanciaResult, DeclaracionesListResult } from "../../declaraciones/types.ts";
 import { output, outputError } from "../../utils/output.ts";
 import { dim, ok } from "../../utils/style.ts";
+
+export function saveConstancia(path: string, bytes: Uint8Array): void {
+	writePrivateOutputFile(path, bytes);
+}
 
 function fail(error: unknown, format: "json" | "table" | "auto"): never {
 	if (error instanceof DeclaracionesPortalError) {
@@ -113,7 +117,7 @@ export function createDeclaracionesCommand(): Command {
 				if (!isPdf(bytes)) {
 					throw new DeclaracionesPortalError("Downloaded bytes are not a PDF.", 502, "not-pdf");
 				}
-				writeFileSync(path, bytes, { mode: 0o600 });
+				saveConstancia(path, bytes);
 				const result: ConstanciaResult = { numOrden, formulario, path, bytes: bytes.length };
 				output(fmt, {
 					json: result,

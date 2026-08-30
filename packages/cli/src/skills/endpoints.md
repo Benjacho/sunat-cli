@@ -155,7 +155,7 @@ have contradicted each other live. The CLI preserves them separately.
 
 ## Consulta de declaraciones juradas y pagos
 
-Base: `https://ww1.sunat.gob.pe/cl-ti-itdeclpagcon-mepeco/cdpS01Alias` — entered
+Base: `https://ww1.sunat.gob.pe/cl-ti-itdeclpagcon-mepeco/cdpS01Alias`, entered
 via menu `12.1.1.1.4`; the hop mints the ww1 session, a cold GET gets the login page.
 
 | Method | `accion` / path | Purpose | Status |

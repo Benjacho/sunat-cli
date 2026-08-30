@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { saveConstancia } from "../../src/commands/declaraciones/index.ts";
 import {
 	DeclaracionesInputError,
 	formatFechaSunat,
@@ -131,6 +134,23 @@ describe("declaraciones input validation", () => {
 		expect(normalizePeriodo("202513")).toBe("202513");
 		expect(() => normalizePeriodo("2026-07")).toThrow(DeclaracionesInputError);
 		expect(() => normalizePeriodo("202614")).toThrow(DeclaracionesInputError);
+	});
+});
+
+describe("declaraciones constancia output", () => {
+	test("repairs permissions when replacing an existing PDF", () => {
+		const dir = mkdtempSync(join(tmpdir(), "sunat-declaraciones-"));
+		try {
+			const path = join(dir, "constancia.pdf");
+			writeFileSync(path, "old");
+			chmodSync(path, 0o644);
+			const bytes = new TextEncoder().encode("%PDF-1.4\nnew");
+			saveConstancia(path, bytes);
+			expect(readFileSync(path)).toEqual(Buffer.from(bytes));
+			expect(statSync(path).mode & 0o777).toBe(0o600);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
 	});
 });
 
