@@ -1,6 +1,6 @@
 ---
 name: sunat-cli
-description: SUNAT tax automation CLI for Peru. Personas naturales (RUC 10), empresas (RUC 20), Renta Anual F709, SIRE and a read-only Buzón SOL metadata reader. Use when the user mentions SUNAT, Buzón SOL, RHE, F616, renta anual, F709, CPE, SIRE, invoices or Peruvian taxes. Package: @crafter/sunat-cli (npm).
+description: SUNAT tax automation CLI for Peru. Personas naturales (RUC 10), empresas (RUC 20), Renta Anual F709, SIRE, filed declarations, constancias and a read-only Buzón SOL metadata reader. Use when the user mentions SUNAT, Buzón SOL, RHE, F616, renta anual, F709, declaraciones, constancias, CPE, SIRE, invoices or Peruvian taxes. Package: @crafter/sunat-cli (npm).
 ---
 
 # sunat-cli
@@ -437,6 +437,24 @@ separate evidence. The legacy visor can return contradictory values.
 `validUntilObserved` is an upstream value, not a legal deadline. The namespace
 does not classify acts, recommend tax actions, poll in the background or support
 multiple RUCs.
+
+## Declaraciones presentadas y constancias
+
+```bash
+sunat-cli declaraciones list --desde 01/06/2026 --hasta 27/08/2026
+sunat-cli declaraciones list --formulario 0601 --periodo 202607
+sunat-cli declaraciones constancia <numOrden> --formulario 0601 --out constancia.pdf
+sunat-cli schema declaraciones
+```
+
+This read-only namespace lists declarations and NPS payments through the local
+SOL browser session. SUNAT limits the presentation-date window to six months,
+and the default is the last 90 days. Form and period filters run locally.
+
+The constancia command downloads a monthly declaration PDF to an owner-only
+file. Annual 0709 and 0710 constancias use another servlet and are not supported
+here. Use `renta constancia` for 0709. Nothing in this namespace files, pays or
+amends.
 
 ## Renta Anual — F709 (Persona Natural)
 

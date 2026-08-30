@@ -161,6 +161,32 @@ SUNAT's `total`, `records` and returned rows can disagree. The JSON contract
 keeps all three observations and sets `countMismatch` instead of choosing one.
 `validUntilObserved` is upstream metadata, not a legal deadline.
 
+### Declaraciones presentadas y constancias
+
+```bash
+sunat-cli login
+sunat-cli declaraciones list --desde 01/06/2026 --hasta 27/08/2026
+sunat-cli declaraciones list --formulario 0601 --periodo 202607
+sunat-cli declaraciones constancia <numOrden> --formulario 0601 --out constancia.pdf
+sunat-cli schema declaraciones
+```
+
+`declaraciones list` opens SOL's "Consulta de declaraciones juradas y pagos"
+(menu `12.1.1.1.4`) in the local SOL session and lists every declaration and
+NPS payment presented in a date range: 0621, 0601 PLAME, 0710, 1663. SUNAT caps
+the window at six months; the default is the last 90 days. `--formulario` and
+`--periodo` filter locally. Rows are `declaracion` (link to a constancia) or
+`pago` (boleta 1663, with the `numPresentacion` it settles).
+
+`declaraciones constancia` downloads the constancia de presentación PDF for a
+número de orden. `--formulario` is required because SUNAT keys the constancia
+by (numOrden, codFor). Annual returns (0709/0710) use a different servlet and
+are not downloaded here; use `renta constancia` for the 0709.
+
+Use this to answer "what did we file for period X?" before preparing the next
+month: the PDF lists the tributos declared (5210 EsSalud, 3052 renta 5ta,
+1011 IGV, 3121 renta MYPE…) and whether the debt was paid at presentation.
+
 ### API & Schema
 
 ```bash
@@ -168,6 +194,7 @@ sunat-cli api token              # Validate OAuth2 credentials without printing 
 sunat-cli schema rhe             # JSON schema for RHE fields
 sunat-cli schema f616            # JSON schema for F616 fields
 sunat-cli schema buzon           # Metadata-only Buzón SOL contract
+sunat-cli schema declaraciones   # Read-only filings + constancia contract
 ```
 
 Use `sunat-cli schema <resource>` to get machine-readable field definitions before constructing payloads.

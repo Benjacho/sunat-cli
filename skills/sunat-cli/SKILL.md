@@ -1,6 +1,6 @@
 ---
 name: sunat-cli
-description: "SUNAT tax automation for Peru from the terminal. Use when the user mentions SUNAT, Buzon SOL, RHE, recibo por honorarios, F616, renta anual, F709, factura or boleta electronica, CPE, SIRE, padron RUC, tipo de cambio SUNAT, or says emitir recibo, emitir factura, declarar F616, anular comprobante, impuestos Peru. Personas naturales with RUC 10 and empresas with RUC 20. Package @crafter/sunat-cli on npm."
+description: "SUNAT tax automation for Peru from the terminal. Use when the user mentions SUNAT, Buzon SOL, RHE, recibo por honorarios, F616, renta anual, F709, declaraciones presentadas, constancias, factura or boleta electronica, CPE, SIRE, padron RUC, tipo de cambio SUNAT, or says emitir recibo, emitir factura, declarar F616, anular comprobante, impuestos Peru. Personas naturales with RUC 10 and empresas with RUC 20. Package @crafter/sunat-cli on npm."
 ---
 
 # sunat-cli

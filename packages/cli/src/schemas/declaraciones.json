@@ -1,0 +1,47 @@
+{
+	"command": "declaraciones",
+	"description": "Read-only listing of filed declarations and payments, with constancia PDF download",
+	"version": "1.0.0",
+	"writesNothing": "The network path is the visor's own accion=lista, accion=validar_constanciaNP and accion=obtener_constanciaNP requests. Nothing files, pays or amends. The only write is the PDF the operator asked for.",
+	"auth": {
+		"portal": "e-menu.sunat.gob.pe menu 12.1.1.1.4 and ww1.sunat.gob.pe/cl-ti-itdeclpagcon-mepeco",
+		"session": "Existing SOL session from sunat-cli login; the ww1 cookie is minted by the menu hop, so the servlet is never opened cold",
+		"credentials": "Clave SOL stays in the OS keychain or environment and is never printed"
+	},
+	"commands": {
+		"list": {
+			"description": "List declarations and NPS payments presented in a date range",
+			"flags": {
+				"--desde": "DD/MM/YYYY, default 90 days ago",
+				"--hasta": "DD/MM/YYYY, default today; SUNAT caps the window at six months",
+				"--formulario": "Client-side filter by form code (0601, 0621, 1663…); a leading zero is added when omitted",
+				"--periodo": "Client-side filter by tax period YYYYMM (annual returns use YYYY13)"
+			}
+		},
+		"constancia": {
+			"description": "Download the constancia de presentación PDF of one filing",
+			"arguments": { "numOrden": "Número de orden from list" },
+			"flags": {
+				"--formulario": "Form code of that filing; required because SUNAT keys the constancia by (numOrden, codFor)",
+				"--out": "Output path, default constancia-<form>-<numOrden>.pdf in the working directory, mode 0600"
+			}
+		}
+	},
+	"itemFields": {
+		"fechaPresentacion": "Presentation or payment date exactly as SUNAT prints it, DD/MM/YYYY",
+		"periodo": "Tax period YYYYMM as printed; annual returns use YYYY13",
+		"formulario": "Four-digit form code: 0601, 0621, 0710, 1663",
+		"descripcion": "SUNAT's own label for the form",
+		"numOrden": "Número de orden printed on the constancia",
+		"kind": "declaracion (links to a constancia) or pago (NPS boleta 1663)",
+		"numPresentacion": "pago rows only: the presentation the boleta settles"
+	},
+	"boundaries": {
+		"filing": "not implemented, by design",
+		"payments": "not implemented, by design",
+		"paymentDetail": "boleta 1663 detail (accion=ComprobanteCons) not implemented",
+		"annualReturns": "0709/0710 are listed but their constancia uses a different servlet and is not downloaded",
+		"pagination": "only the first page of results is read",
+		"multiRuc": "not implemented"
+	}
+}

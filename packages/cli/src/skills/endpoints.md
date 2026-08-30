@@ -153,6 +153,25 @@ authenticated cross-origin frame.
 The response fields `total`, `records` and `rows.length` are not equivalent and
 have contradicted each other live. The CLI preserves them separately.
 
+## Consulta de declaraciones juradas y pagos
+
+Base: `https://ww1.sunat.gob.pe/cl-ti-itdeclpagcon-mepeco/cdpS01Alias`, entered
+via menu `12.1.1.1.4`; the hop mints the ww1 session, a cold GET gets the login page.
+
+| Method | `accion` / path | Purpose | Status |
+|---|---|---|---|
+| POST | `accion=lista` + `fechaDesde`, `fechaHasta` (DD/MM/YYYY), empty `num_pres`, `cod_for`, `num_ord` | results table | observed 200 |
+| POST | `accion=validar_constanciaNP&num_ord=…&cod_for=0601` | `<codigo>{GUID}</codigo>`, `0` = not rendered yet | observed 200 |
+| GET | `?accion=obtener_constanciaNP&cod_ecm={GUID}` | constancia PDF | observed 200, `application/pdf` |
+| POST | `accion=ComprobanteCons` (`formulario=1663`, `numPres`, `numOrden`) | boleta detail | empty body via fetch, not used |
+| POST | `accion=obtener_reportPdf` (`num_pres`, `cod_for`, `num_ord`) | 0709/0710 constancia | from source, not used |
+| POST | `ConsultaDeclaracion.jsp` (`tamanioPagina`, `pagina`) | pagination | from source, not used |
+
+Rows link to `constanciaNP(numOrden,'0601')` for declarations and
+`comprobante('1663', numPres, '', numOrden)` for NPS boletas; the anchor, not
+the cells, is the reliable source of `numOrden` and `codFor`. Range ≤ 6 months
+(`diferenciaMayor6meses`). Measured 2026-08-27 with a RUC 20.
+
 ## Login
 
 ```
